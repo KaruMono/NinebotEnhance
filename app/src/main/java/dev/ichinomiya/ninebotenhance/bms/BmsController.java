@@ -247,7 +247,12 @@ public final class BmsController {
                 if(newState==BluetoothProfile.STATE_CONNECTED){
                     publish(state.withPhase(BmsState.HANDSHAKE,""));
                     worker.removeCallbacks(handshakeTimeout);worker.postDelayed(handshakeTimeout,HANDSHAKE_TIMEOUT_MS);
-                    try{g.requestMtu(REQUEST_MTU);}catch(RuntimeException e){log("mtu request "+error(e));try{g.discoverServices();}catch(RuntimeException e2){close(error(e2));}}
+                    try{
+    if(!g.requestMtu(REQUEST_MTU))g.discoverServices();
+}catch(RuntimeException e){
+    log("mtu request "+error(e));
+    try{g.discoverServices();}catch(RuntimeException e2){close(error(e2));}
+                    }
                 }else if(newState==BluetoothProfile.STATE_DISCONNECTED){log("disconnected status="+status);close(status==0?"":"连接断开 "+status);}
             });
         }
@@ -264,7 +269,11 @@ public final class BmsController {
                     g.setCharacteristicNotification(notifyCharacteristic,true);
                     BluetoothGattDescriptor cccd=notifyCharacteristic.getDescriptor(UUID.fromString(DlBmsProtocol.CCCD));
                     if(cccd==null){close("通知描述符缺失");return;}
-                    Gatt.writeDescriptor(g,cccd,BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+                    Gatt.writeDescriptor(g,cccd,
+    (notifyCharacteristic.getProperties()&BluetoothGattCharacteristic.PROPERTY_NOTIFY)==0
+        &&(notifyCharacteristic.getProperties()&BluetoothGattCharacteristic.PROPERTY_INDICATE)!=0
+                ?BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
+                :BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
                 }catch(RuntimeException e){close(error(e));}
             });
         }
