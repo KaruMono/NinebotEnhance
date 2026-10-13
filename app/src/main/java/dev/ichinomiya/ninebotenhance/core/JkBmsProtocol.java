@@ -29,7 +29,8 @@ public final class JkBmsProtocol extends BufferedBmsProtocol {
     @Override public long silenceMs(int pollMs){return Math.max(pollMs*3L+2000,15000);}
     @Override protected int headerLength(){return 4;}
     @Override protected boolean atHeader(int offset){
-        return (buffer[offset]&0xff)==0x55&&(buffer[offset+1]&0xff)==0xaa&&(buffer[offset+2]&0xff)==0x90&&(buffer[offset+3]&0xff)==0xeb;
+        // JK commands use 55 AA 90 EB, while status notifications use 55 AA EB 90.
+        return (buffer[offset]&0xff)==0x55&&(buffer[offset+1]&0xff)==0xaa&&(buffer[offset+2]&0xff)==0xeb&&(buffer[offset+3]&0xff)==0x90;
     }
     @Override protected int frameLength(){
         if(length<FRAME)return NEED_MORE;
