@@ -176,9 +176,19 @@ public final class BmsController {
         writing=true;
         try{
             int status=Gatt.write(gatt,writeCharacteristic,part,writeType);
+            log("write protocol="+BmsSettings.protocolName(board)+" bytes="+part.length
+                    +" type="+writeType+" status="+status+" head="+hex(part,Math.min(8,part.length)));
             if(status!=BluetoothStatusCodes.SUCCESS){writing=false;pending=null;log("write rejected "+status);publish(state.withPhase(state.phase(),"写入被拒绝 "+status));return;}
             pendingOffset+=chunk;if(pendingOffset>=pending.length)pending=null;
-            worker.removeCallbacks(writeWatchdog);worker.postDelayed(writeWatchdog,WRITE_TIMEOUT_MS);
+            worker.removeCallbacks(writeWatchdog);
+            if(writeType==BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE){
+                // WRITE_NO_RESPONSE has no reliable completion callback on all Android
+                // stacks. Advance the queue after a small pacing gap instead of waiting
+                // for the watchdog, otherwise JK requests can silently pile up.
+                writing=false;worker.postDelayed(chunkRunnable,CHUNK_GAP_MS);
+            }else{
+                worker.postDelayed(writeWatchdog,WRITE_TIMEOUT_MS);
+            }
         }catch(RuntimeException e){writing=false;pending=null;close(error(e));}
     }
     private final Runnable writeWatchdog=new Runnable(){@Override public void run(){if(!writing)return;log("write callback missing");writing=false;pending=null;drain();}};
@@ -203,10 +213,17 @@ public final class BmsController {
             if((write.getProperties()&(BluetoothGattCharacteristic.PROPERTY_WRITE|BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE))==0)continue;
             if((notification.getProperties()&(BluetoothGattCharacteristic.PROPERTY_NOTIFY|BluetoothGattCharacteristic.PROPERTY_INDICATE))==0)continue;
             writeCharacteristic=write;notifyCharacteristic=notification;
-            writeType=(write.getProperties()&BluetoothGattCharacteristic.PROPERTY_WRITE)!=0
+            // JK BLE modules commonly advertise both WRITE and WRITE_NO_RESPONSE on the
+            // same characteristic, but only accept the latter reliably. Prefer it for JK;
+            // other protocols keep the acknowledged write path.
+            boolean noResponse=(board==BmsSettings.PROTOCOL_JK)
+                    &&(write.getProperties()&BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE)!=0;
+            writeType=noResponse?BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+                    :(write.getProperties()&BluetoothGattCharacteristic.PROPERTY_WRITE)!=0
                     ?BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT:BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE;
             log("endpoint service="+endpoint.service()+" write="+write.getUuid()+" props="+write.getProperties()
-                    +" notify="+notification.getUuid()+" props="+notification.getProperties());
+                    +" notify="+notification.getUuid()+" props="+notification.getProperties()
+                    +" writeType="+writeType);
             return true;
         }
         return false;
