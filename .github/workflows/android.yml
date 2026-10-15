@@ -24,3 +24,11 @@ jobs:
       run: chmod +x gradlew
     - name: Build with Gradle
       run: ./gradlew build
+
+    - name: Upload APK artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: NinebotEnhance-apk-${{ github.run_number }}
+        path: app/build/outputs/apk/**/*.apk
+        if-no-files-found: error
+        retention-days: 14
