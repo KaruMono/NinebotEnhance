@@ -83,8 +83,10 @@ final class BmsTests {
                 &&Arrays.equals(yy.begin(0)[0],bytes(0x01,0x03,0x00,0x4B,0x00,0x5C,0x35,0xE5)),
                 "every board is asked for its status with its own published command bytes");
         byte[] jkInfo=jk.begin(0)[0],jkStream=jk.poll(0,0)[0];
-        CoreTests.check(jkInfo.length==20&&jkInfo[4]==(byte)0x97&&jkStream[4]==(byte)0x96&&jkInfo[19]==0x11&&jkStream[19]==0x10
-                &&jk.poll(9000,9000).length==0&&Arrays.equals(jk.followUp(0,0),jkStream),"JK opens with the device info frame, then the stream, and stops once it is pushing");
+        CoreTests.check(jkInfo.length==20&&Arrays.equals(Arrays.copyOf(jkInfo,4),bytes(0xAA,0x55,0x90,0xEB))
+                &&Arrays.equals(Arrays.copyOf(jkStream,4),bytes(0xAA,0x55,0x90,0xEB))
+                &&jkInfo[4]==(byte)0x97&&jkStream[4]==(byte)0x96&&jkInfo[19]==0x11&&jkStream[19]==0x10
+                &&jk.poll(9000,9000).length==0&&Arrays.equals(jk.followUp(0,0),jkStream),"JK requests use the AA 55 90 EB request preamble, then stream and stop polling once pushing");
         BmsData a=ant.accept(antStatus(1000),1000);
         //CoreTests.check(a!=null&&a.cells()==16&&near(a.volts(),52.84f)&&near(a.amps(),0.3f)&&!a.charging()&&a.soc()==91
                // &&near(a.capacityAh(),280.0f)&&Math.abs(a.remainingAh()-252.602325f)<1e-3&&a.temps()[0]==1&&a.temps()[1]==2

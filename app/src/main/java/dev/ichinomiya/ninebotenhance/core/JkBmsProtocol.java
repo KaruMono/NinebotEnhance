@@ -20,7 +20,9 @@ public final class JkBmsProtocol extends BufferedBmsProtocol {
     private static final BmsProtocol.Endpoint VENDOR_ENDPOINT_2=new Endpoint(JK_VENDOR_SERVICE,JK_VENDOR_CHANNEL_2,JK_VENDOR_CHANNEL_2,false,false);
     private static byte[] request(int cmd){
         byte[] frame=new byte[20];
-        frame[0]=0x55;frame[1]=(byte)0xaa;frame[2]=(byte)0x90;frame[3]=(byte)0xeb;frame[4]=(byte)cmd;
+        // JK request and response preambles intentionally differ: requests are AA 55 90 EB,
+        // while streamed status notifications start with 55 AA EB 90.
+        frame[0]=(byte)0xaa;frame[1]=0x55;frame[2]=(byte)0x90;frame[3]=(byte)0xeb;frame[4]=(byte)cmd;
         int sum=0;for(int i=0;i<19;i++)sum+=frame[i]&0xff;
         frame[19]=(byte)sum;
         return frame;
