@@ -8,7 +8,11 @@ public final class JkBmsProtocol extends BufferedBmsProtocol {
     private static final int FRAME=300;
     private static final byte[] INFO=request(0x97),STREAM=request(0x96);
     private static final int[] TEMPERATURES={130,132,222,224,226};
-    private static final BmsProtocol.Endpoint ENDPOINT=new Endpoint(FFE0,FFE1,FFE1,false,false);
+    private static final BmsProtocol.Endpoint LEGACY_ENDPOINT=new Endpoint(FFE0,FFE1,FFE1,false,false);
+    // Newer JK modules expose the same bidirectional notification channel under a
+    // vendor service. Keep the legacy endpoint first for backward compatibility.
+    private static final BmsProtocol.Endpoint VENDOR_ENDPOINT_1=new Endpoint(JK_VENDOR_SERVICE,JK_VENDOR_CHANNEL_1,JK_VENDOR_CHANNEL_1,false,false);
+    private static final BmsProtocol.Endpoint VENDOR_ENDPOINT_2=new Endpoint(JK_VENDOR_SERVICE,JK_VENDOR_CHANNEL_2,JK_VENDOR_CHANNEL_2,false,false);
     private static byte[] request(int cmd){
         byte[] frame=new byte[20];
         frame[0]=0x55;frame[1]=(byte)0xaa;frame[2]=(byte)0x90;frame[3]=(byte)0xeb;frame[4]=(byte)cmd;
@@ -19,7 +23,7 @@ public final class JkBmsProtocol extends BufferedBmsProtocol {
     static boolean name(String label){return label!=null&&label.trim().toLowerCase(java.util.Locale.ROOT).startsWith("jk");}
     private int layout;
     @Override public int id(){return BmsSettings.PROTOCOL_JK;}
-    @Override public List<Endpoint> endpoints(){return List.of(ENDPOINT);}
+    @Override public List<Endpoint> endpoints(){return List.of(LEGACY_ENDPOINT,VENDOR_ENDPOINT_1,VENDOR_ENDPOINT_2);}
     @Override public byte[][] begin(long now){return new byte[][]{INFO};}
     @Override public byte[] followUp(long now,long lastDataAt){return lastDataAt==0?STREAM:null;}
     @Override public long followUpDelayMs(){return 500;}
