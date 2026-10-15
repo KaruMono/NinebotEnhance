@@ -10,7 +10,7 @@ import java.util.List;
  */
 public interface BmsProtocol {
     /** The 16-bit services every board in the family lives on, with the base 00000000-0000-1000-8000-00805f9b34fb. */
-    String FFE0="0000ffe0-0000-1000-8000-00805f9b34fb",FFE1="0000ffe1-0000-1000-8000-00805f9b34fb";
+    String FFE0="0000ffe0-0000-1000-8000-00805f9b34fb",FFE1="0000ffe1-0000-1000-8000-00805f9b34fb",FFE2="0000ffe2-0000-1000-8000-00805f9b34fb";
     /** JK modules that expose the vendor service instead of (or in addition to) the legacy FFE0 service. */
     String JK_VENDOR_SERVICE="f000ffc0-0451-4000-b000-000000000000",JK_VENDOR_CHANNEL_1="f000ffc1-0451-4000-b000-000000000000",JK_VENDOR_CHANNEL_2="f000ffc2-0451-4000-b000-000000000000";
     String FF00="0000ff00-0000-1000-8000-00805f9b34fb",FF01="0000ff01-0000-1000-8000-00805f9b34fb",FF02="0000ff02-0000-1000-8000-00805f9b34fb";

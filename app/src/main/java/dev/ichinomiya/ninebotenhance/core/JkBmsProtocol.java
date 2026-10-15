@@ -8,7 +8,9 @@ public final class JkBmsProtocol extends BufferedBmsProtocol {
     private static final int FRAME=300;
     private static final byte[] INFO=request(0x97),STREAM=request(0x96);
     private static final int[] TEMPERATURES={130,132,222,224,226};
-    private static final BmsProtocol.Endpoint LEGACY_ENDPOINT=new Endpoint(FFE0,FFE1,FFE1,false,false);
+    // The real legacy JK BLE layout uses FFE2 for TX (write without response) and FFE1 for RX notifications.
+    // FFE1 is also writable on some modules, but those writes are ignored by the module tested in the field.
+    private static final BmsProtocol.Endpoint LEGACY_ENDPOINT=new Endpoint(FFE0,FFE2,FFE1,false,false);
     // Newer JK modules expose the same bidirectional notification channel under a
     // vendor service. Keep the legacy endpoint first for backward compatibility.
     private static final BmsProtocol.Endpoint VENDOR_ENDPOINT_1=new Endpoint(JK_VENDOR_SERVICE,JK_VENDOR_CHANNEL_1,JK_VENDOR_CHANNEL_1,false,false);
