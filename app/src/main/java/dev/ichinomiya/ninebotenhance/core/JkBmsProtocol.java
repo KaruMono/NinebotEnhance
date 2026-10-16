@@ -8,12 +8,11 @@ public final class JkBmsProtocol extends BufferedBmsProtocol {
     private static final int FRAME=300;
     private static final byte[] INFO=request(0x97),STREAM=request(0x96);
     private static final int[] TEMPERATURES={130,132,222,224,226};
-    // JK modules are inconsistent about the two legacy characteristics. Some expose FFE2 as a
-    // write-only transport, while others only answer when the request is written to FFE1,
-    // which is also the notification characteristic. Prefer the bidirectional characteristic
-    // when it advertises write support; retain FFE2/FFE1 as a compatibility fallback.
-    private static final BmsProtocol.Endpoint LEGACY_BIDIRECTIONAL=new Endpoint(FFE0,FFE1,FFE1,false,false);
+    // JK legacy modules normally use FFE2 for writes and FFE1 for notifications.
+    // Some newer/variant modules accept writes on the bidirectional FFE1 characteristic,
+    // so retain that arrangement as a fallback rather than selecting it first.
     private static final BmsProtocol.Endpoint LEGACY_ENDPOINT=new Endpoint(FFE0,FFE2,FFE1,false,false);
+    private static final BmsProtocol.Endpoint LEGACY_BIDIRECTIONAL=new Endpoint(FFE0,FFE1,FFE1,false,false);
     // Newer JK modules expose the same bidirectional notification channel under a
     // vendor service. Keep the legacy endpoint first for backward compatibility.
     private static final BmsProtocol.Endpoint VENDOR_ENDPOINT_1=new Endpoint(JK_VENDOR_SERVICE,JK_VENDOR_CHANNEL_1,JK_VENDOR_CHANNEL_1,false,false);
@@ -30,7 +29,7 @@ public final class JkBmsProtocol extends BufferedBmsProtocol {
     static boolean name(String label){return label!=null&&label.trim().toLowerCase(java.util.Locale.ROOT).startsWith("jk");}
     private int layout;
     @Override public int id(){return BmsSettings.PROTOCOL_JK;}
-    @Override public List<Endpoint> endpoints(){return List.of(LEGACY_BIDIRECTIONAL,LEGACY_ENDPOINT,VENDOR_ENDPOINT_1,VENDOR_ENDPOINT_2);}
+    @Override public List<Endpoint> endpoints(){return List.of(LEGACY_ENDPOINT,LEGACY_BIDIRECTIONAL,VENDOR_ENDPOINT_1,VENDOR_ENDPOINT_2);}
     @Override public byte[][] begin(long now){return new byte[][]{INFO};}
     @Override public byte[] followUp(long now,long lastDataAt){return lastDataAt==0?STREAM:null;}
     @Override public long followUpDelayMs(){return 500;}
