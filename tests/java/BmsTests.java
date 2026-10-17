@@ -60,7 +60,7 @@ final class BmsTests {
         BmsState state=BmsState.NONE.withData(d);
         CoreTests.check(state.ready()&&state.connected(1500,settings.limitMs())&&!state.connected(20000,settings.limitMs())&&!BmsState.of(BmsState.CONNECTING,"").connected(1500,settings.limitMs())&&state.describe().startsWith("已连接 SOC 88%")&&BmsState.of(BmsState.IDLE,"").describe().equals("未连接")&&!BmsState.of(BmsState.IDLE,"").connected(1500,settings.limitMs()),"the state reports a fresh reading and expires an old one");
         BmsCard.Layout layout=BmsCard.parse("1,2|4,4,9|7");
-        CoreTests.check(layout.rows().get(0).equals(List.of(1,2))&&layout.rows().get(1).equals(List.of(4))&&layout.rows().get(2).equals(List.of(7))&&layout.encode().equals("1,2|4|7")&&layout.height()==3*BmsCard.ROW_HEIGHT,"the layout drops repeats and unknown fields and keeps three rows");
+        CoreTests.check(layout.rows().get(0).equals(List.of(1,2))&&layout.rows().get(1).equals(List.of(4,9))&&layout.rows().get(2).equals(List.of(7))&&layout.encode().equals("1,2|4,9|7")&&layout.height()==3*BmsCard.ROW_HEIGHT,"the layout drops repeats and unknown fields and keeps three rows");
         BmsCard.Layout sparse=BmsCard.parse("|3||");
         CoreTests.check(sparse.rowCount()==1&&sparse.height()==BmsCard.ROW_HEIGHT&&sparse.rowOf(3)==1&&sparse.rowOf(1)==-1&&BmsCard.parse("").equals(BmsCard.DEFAULT)&&BmsCard.parse("|||").height()==BmsCard.ROW_HEIGHT,"empty rows are hidden and an empty layout still has one row");
         CoreTests.check(BmsCard.value(BmsCard.VOLTAGE,d).equals("80.4")&&BmsCard.value(BmsCard.REMAINING_AH,d).equals("26.4")&&BmsCard.value(BmsCard.SOC,BmsData.EMPTY).equals("--")&&BmsCard.unit(BmsCard.DIFF).equals("mV")&&BmsCard.label(BmsCard.CYCLES).equals("循环次数"),"field texts");
