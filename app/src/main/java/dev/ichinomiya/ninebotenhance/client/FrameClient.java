@@ -1036,6 +1036,8 @@ public final class FrameClient {
         View preview = inlinePreview.get(); if (preview != null) preview.postInvalidateOnAnimation();
     }
     /** What the drawn picture shows right now: the same telemetry the cards read, with the cards' freshness limits. */
+    /** Fixed offset observed on the cast picture versus the vehicle's displayed pack voltage. */
+    private static final float DRAW_VOLTAGE_OFFSET_V = 2.0f;
     private dev.ichinomiya.ninebotenhance.notification.DrawPanel.Values drawValues(long now) {
         WidgetSettings w = widgets;
         RideState.Snapshot r = ride.snapshot();
@@ -1044,7 +1046,9 @@ public final class FrameClient {
         float speed = r.speedAt() == 0 || r.speedTenths() < 0 || now - r.speedAt() > w.speedLimitMs() ? Float.NaN : r.speedKmh();
         float watts = boardPower ? bms.data().watts() : !r.hasPower() || now - r.powerAt() > w.powerLimitMs() ? Float.NaN : r.power();
         dev.ichinomiya.ninebotenhance.core.BatteryTelemetry.Value v = battery.snapshot().voltage();
-        float volts = boardVoltage ? bms.data().volts() : v == null || now - v.elapsedTime() > w.voltageLimitMs() ? Float.NaN : v.number();
+        // The cast/draw path consistently reports the pack about 2 V low compared with the vehicle's displayed voltage.
+        // Keep raw telemetry unchanged for diagnostics and BMS calculations; apply the correction only to the drawn value.
+        float volts = boardVoltage ? bms.data().volts() + DRAW_VOLTAGE_OFFSET_V : v == null || now - v.elapsedTime() > w.voltageLimitMs() ? Float.NaN : v.number() + DRAW_VOLTAGE_OFFSET_V;
         dev.ichinomiya.ninebotenhance.core.TireTelemetry.Snapshot t = tires.snapshot();
         return new dev.ichinomiya.ninebotenhance.notification.DrawPanel.Values(speed, watts, volts, bms.data().known() ? bms.data().soc() : -1,
         bms.data().known() ? bms.data().remainingAh() : Float.NaN,
