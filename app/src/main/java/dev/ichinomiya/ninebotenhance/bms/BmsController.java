@@ -28,7 +28,9 @@ import java.util.function.Consumer;
  * next hold. A dropped link is simply reopened and the handshake repeated. Nothing is ever written to a board but read commands.
  */
 public final class BmsController {
-    public static final long HOLD_MS=6000,SCREEN_HOLD_MS=15000,SCREEN_RENEW_MS=5000;
+    // Dashboard IPC can briefly pause while the host switches screens. Keep a
+    // connected BMS alive across that pause instead of closing the GATT link.
+    public static final long HOLD_MS=30000,SCREEN_HOLD_MS=30000,SCREEN_RENEW_MS=10000;
     /** Who holds the link; the same three sources as the lamp. */
     public static final int HOLD_SESSION=0,HOLD_FOREGROUND=1,HOLD_SCREEN=2;
     private static final long HANDSHAKE_TIMEOUT_MS=8000,RETRY_MS=5000,TICK_MS=1000;
@@ -49,7 +51,7 @@ public final class BmsController {
     private boolean writing,ticking,idle=true,ready;private int failures,mtu=DEFAULT_MTU,serial;
     private int writeType=BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT;
     private final long[] holds=new long[3];
-    private long retryAt,lastDataAt,armedAt;private int missedPolls;
+    private long retryAt,lastDataAt,lastNotifyAt,armedAt;private int missedPolls;
     private int board=BmsSettings.PROTOCOL_DL;private BmsProtocol protocol;private byte[] followUp;
     private byte[] privateKey,key,iv;private byte[] inbound=new byte[512];private int inboundLength;
     private BmsController(Context context){
@@ -133,7 +135,7 @@ public final class BmsController {
         try{device=adapter.getRemoteDevice(current.mac());}
         catch(RuntimeException e){publish(BmsState.of(BmsState.FAILED,"地址无效"));return;}
         queue.clear();writing=false;writeCharacteristic=null;notifyCharacteristic=null;key=iv=privateKey=null;
-        inboundLength=0;mtu=DEFAULT_MTU;missedPolls=0;lastDataAt=0;armedAt=0;ready=false;
+        inboundLength=0;mtu=DEFAULT_MTU;missedPolls=0;lastDataAt=0;lastNotifyAt=0;armedAt=0;ready=false;
         protocol=null;followUp=null;worker.removeCallbacks(followUpRunnable);
         board=current.protocol();
         publish(state.withPhase(BmsState.CONNECTING,""));
@@ -257,7 +259,14 @@ public final class BmsController {
         long now=SystemClock.elapsedRealtime();
         long silence=protocol==null?settings.pollMs()*3L+2000:protocol.silenceMs(settings.pollMs());
         long since=lastDataAt>0?lastDataAt:armedAt;
-        if(now-since>silence){missedPolls++;log("no data for "+missedPolls+" polls");}
+        // A notification can be fragmented or rejected by the parser. It still proves
+        // that GATT is alive, so do not tear down a live notification stream.
+        long notifySince=lastNotifyAt>0?lastNotifyAt:armedAt;
+        if(now-notifySince>silence&&now-since>silence){
+            missedPolls++;log("no notification for "+missedPolls+" polls");
+        }else if(missedPolls!=0){
+            missedPolls=0;log("notification stream resumed");
+        }
         if(missedPolls>=3){close("读取无应答");retryAt=0;return;}
         if(protocol==null)send(DlBmsProtocol.FC_DATA,new byte[0]);
         else{
@@ -294,6 +303,12 @@ public final class BmsController {
                 List<BmsProtocol.Endpoint> endpoints=protocol==null?List.of(DlBmsProtocol.ENDPOINT):protocol.endpoints();
                 if(!attach(g,endpoints)){close(protocol==null?"未找到 BMS 服务":"未找到协议特征");return;}
                 try{
+                    // A moderate interval is more reliable for small BMS modules than the
+                    // phone's default connection interval, while keeping enough bandwidth
+                    // for the 300-byte JK status frame.
+                    if(Build.VERSION.SDK_INT>=21){
+                        try{g.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_BALANCED);}catch(RuntimeException ignored){}
+                    }
                     g.setCharacteristicNotification(notifyCharacteristic,true);
                     log("subscribe props="+notifyCharacteristic.getProperties());
                     BluetoothGattDescriptor cccd=notifyCharacteristic.getDescriptor(UUID.fromString(DlBmsProtocol.CCCD));
@@ -337,6 +352,7 @@ public final class BmsController {
     };
     /** Notifications are pieces of one frame; plain frames are parsed as they complete, encrypted ones once whole blocks decrypt to a complete frame. */
     private void received(byte[] value){
+        if(!Objects.isNull(value)&&value.length>0)lastNotifyAt=SystemClock.elapsedRealtime();
         if(!Objects.isNull(value)&&value.length>0)log("notify protocol="+BmsSettings.protocolName(board)+" bytes="+value.length+" head="+hex(value,Math.min(12,value.length)));
         if(value==null||value.length==0)return;
         if(protocol!=null){
