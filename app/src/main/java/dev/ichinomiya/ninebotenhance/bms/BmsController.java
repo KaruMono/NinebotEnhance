@@ -303,12 +303,6 @@ public final class BmsController {
                 List<BmsProtocol.Endpoint> endpoints=protocol==null?List.of(DlBmsProtocol.ENDPOINT):protocol.endpoints();
                 if(!attach(g,endpoints)){close(protocol==null?"未找到 BMS 服务":"未找到协议特征");return;}
                 try{
-                    // A moderate interval is more reliable for small BMS modules than the
-                    // phone's default connection interval, while keeping enough bandwidth
-                    // for the 300-byte JK status frame.
-                    if(Build.VERSION.SDK_INT>=21){
-                        try{g.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_BALANCED);}catch(RuntimeException ignored){}
-                    }
                     g.setCharacteristicNotification(notifyCharacteristic,true);
                     log("subscribe props="+notifyCharacteristic.getProperties());
                     BluetoothGattDescriptor cccd=notifyCharacteristic.getDescriptor(UUID.fromString(DlBmsProtocol.CCCD));
