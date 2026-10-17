@@ -136,11 +136,13 @@ public final class RootDisplayMain {
             }
             log("RENDER plan " + (scaledRender ? captureWidth + "x" + captureHeight + "@" + renderDpi : "not needed, phone density equals the layout density"));
         }
-        // Public own-content display, touch input, destroy its tasks on removal, trusted independent focus.
+        // Public own-content display, touch input, destroy its tasks on removal and trusted input.
+        // Do not request OWN_DISPLAY_GROUP: tying the virtual display to a separate display group
+        // makes Android re-evaluate media routing/volume when the screen is entered again.
         // Independent keyguard state, like VirtualDisplay's default ALWAYS_UNLOCKED option.
         int flags = DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC | DisplayManager.VIRTUAL_DISPLAY_FLAG_PRESENTATION
                 | DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY | (1 << 6) | (1 << 7) | (1 << 8)
-                | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 14);
+                | (1 << 10) | (1 << 12) | (1 << 14);
         // No SHOULD_SHOW_SYSTEM_DECORATIONS: do not create a secondary desktop, taskbar or app drawer.
         // VirtualDisplay's default ROTATES_WITH_CONTENT couples the logical orientation to
         // the output Surface. Without it Android treats this as a fixed external panel and
