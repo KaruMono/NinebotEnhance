@@ -51,7 +51,7 @@ public final class BmsCard {
     }
     public static boolean known(int field){for(int f:FIELDS)if(f==field)return true;return false;}
     public static String label(int field){
-        return switch(field){case SOC->"SOC";case VOLTAGE->"电压";case CURRENT->"电流";case POWER->"功率";case CYCLE_AH->"循环";case REMAINING_AH->"剩余";case DIFF->"压差";case CYCLES->"循环次数";case CELLS->"串数";default->"";};
+        return switch(field){case SOC->"SOC";case VOLTAGE->"电压";case CURRENT->"电流";case POWER->"功率";case CYCLE_AH->"累计 Ah";case REMAINING_AH->"剩余 Ah";case DIFF->"压差";case CYCLES->"循环次数";case CELLS->"串数";default->"";};
     }
     public static String unit(int field){
         return switch(field){case SOC->"%";case VOLTAGE->"V";case CURRENT->"A";case POWER->"W";case CYCLE_AH->"Ah";case REMAINING_AH->"Ah";case DIFF->"mV";case CYCLES->"次";case CELLS->"串";default->"";};

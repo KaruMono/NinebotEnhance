@@ -14,8 +14,8 @@ public record DrawLayout(float left, float top, float right, float bottom, float
         float radius = Math.min(width * 0.5f, gauge * 0.5f) * 0.8f, stroke = radius * 0.13f;
         float centerX = width / 2f, centerY = top + gauge * 0.55f;
         float strip = bottom - (top + gauge);
-        return new DrawLayout(0, top, width, bottom, centerX, centerY, radius, stroke, radius * 0.6f, radius * 0.19f, radius * 0.16f,
-                top + gauge, fields > 0 ? width / (float) fields : width, strip * 0.4f, strip * 0.2f);
+        return new DrawLayout(0, top, width, bottom, centerX, centerY, radius, stroke, radius * 1.2f, radius * 0.38f, radius * 0.32f,
+                top + gauge, fields > 0 ? width / (float) fields : width, strip * 0.8f, strip * 0.4f);
     }
     /** Degrees of arc for a value on a gauge of the given full scale; clamped to the arc. */
     public static float sweepFor(float value, float max) {
