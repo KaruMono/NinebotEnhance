@@ -7,8 +7,8 @@ import java.util.*;
  * The layout is stored as rows separated by "|" with field ids separated by ","; a field may appear in one row only.
  */
 public final class BmsCard {
-    public static final int SOC=1,VOLTAGE=2,CURRENT=3,POWER=4,CYCLE_AH=5,DIFF=6,CYCLES=7,CELLS=8;
-    public static final int[] FIELDS={SOC,VOLTAGE,CURRENT,POWER,CYCLE_AH,DIFF,CYCLES,CELLS};
+    public static final int SOC=1,VOLTAGE=2,CURRENT=3,POWER=4,CYCLE_AH=5,DIFF=6,CYCLES=7,CELLS=8,REMAINING_AH=9;
+    public static final int[] FIELDS={SOC,VOLTAGE,CURRENT,POWER,CYCLE_AH,REMAINING_AH,DIFF,CYCLES,CELLS};
     public static final int MAX_ROWS=3;
     public static final float ROW_HEIGHT=28;
     public record Layout(List<List<Integer>> rows){
@@ -51,17 +51,17 @@ public final class BmsCard {
     }
     public static boolean known(int field){for(int f:FIELDS)if(f==field)return true;return false;}
     public static String label(int field){
-        return switch(field){case SOC->"SOC";case VOLTAGE->"电压";case CURRENT->"电流";case POWER->"功率";case CYCLE_AH->"循环";case DIFF->"压差";case CYCLES->"循环次数";case CELLS->"串数";default->"";};
+        return switch(field){case SOC->"SOC";case VOLTAGE->"电压";case CURRENT->"电流";case POWER->"功率";case CYCLE_AH->"循环";case REMAINING_AH->"剩余";case DIFF->"压差";case CYCLES->"循环次数";case CELLS->"串数";default->"";};
     }
     public static String unit(int field){
-        return switch(field){case SOC->"%";case VOLTAGE->"V";case CURRENT->"A";case POWER->"W";case CYCLE_AH->"Ah";case DIFF->"mV";case CYCLES->"次";case CELLS->"串";default->"";};
+        return switch(field){case SOC->"%";case VOLTAGE->"V";case CURRENT->"A";case POWER->"W";case CYCLE_AH->"Ah";case REMAINING_AH->"Ah";case DIFF->"mV";case CYCLES->"次";case CELLS->"串";default->"";};
     }
     /** Value text; "--" when the reading is missing. */
     public static String value(int field,BmsData d){
         if(d==null||!d.known())return "--";
         return switch(field){
             case SOC->d.soc()<0?"--":String.valueOf(d.soc());case VOLTAGE->String.format(Locale.ROOT,"%.1f",d.volts());case CURRENT->String.format(Locale.ROOT,"%.1f",d.amps());
-            case POWER->String.valueOf(d.watts());case CYCLE_AH->String.format(Locale.ROOT,"%.1f",d.cycleAh());case DIFF->String.valueOf(d.diffMv());
+            case POWER->String.valueOf(d.watts());case CYCLE_AH->String.format(Locale.ROOT,"%.1f",d.cycleAh());case REMAINING_AH->String.format(Locale.ROOT,"%.1f",d.remainingAh());case DIFF->String.valueOf(d.diffMv());
             case CYCLES->String.valueOf(d.cycles());case CELLS->String.valueOf(d.cells());default->"";
         };
     }

@@ -14,7 +14,7 @@ public record BmsData(String name,int mos,int cells,float capacityAh,float remai
     public boolean charging(){return amps<0;}
     public int temperature(){if(temps.length==0)return Integer.MIN_VALUE;int max=temps[0];for(int t:temps)max=Math.max(max,t);return max;}
     public String describe(){
-        return known()?String.format(Locale.ROOT,"SOC %d%% %.1fV %.1fA %dW 压差 %dmV 循环 %d 串数 %d",soc,volts,amps,watts,diffMv,cycles,cells):"无数据";
+        return known()?String.format(Locale.ROOT,"SOC %d%% %.1fV %.1fA %dW 剩余 %.1fAh/%.1fAh 压差 %dmV 循环 %d 串数 %d",soc,volts,amps,watts,remainingAh,capacityAh,diffMv,cycles,cells):"无数据";
     }
     @Override public boolean equals(Object o){
         if(this==o)return true;if(!(o instanceof BmsData d))return false;

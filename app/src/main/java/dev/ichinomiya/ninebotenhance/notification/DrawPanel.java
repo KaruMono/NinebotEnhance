@@ -15,8 +15,8 @@ import java.util.Objects;
  */
 public final class DrawPanel {
     /** What is on screen; NaN and -1 mean unknown and are shown as "--". */
-    public record Values(float speedKmh, float watts, float volts, int soc, float frontBar, float rearBar,int pressureMv) {
-        public static final Values NONE = new Values(Float.NaN, Float.NaN, Float.NaN, -1, Float.NaN, Float.NaN,-1);
+    public record Values(float speedKmh, float watts, float volts, int soc, float remainingAh, float frontBar, float rearBar,int pressureMv) {
+        public static final Values NONE = new Values(Float.NaN, Float.NaN, Float.NaN, -1, Float.NaN, Float.NaN, Float.NaN,-1);
     }
     private final Paint arc = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final TextPaint text = new TextPaint(Paint.ANTI_ALIAS_FLAG);
@@ -60,12 +60,13 @@ public final class DrawPanel {
                     + (Float.isNaN(v.rearBar()) ? "--" : String.format(Locale.ROOT, "%.1f", v.rearBar())) + " bar";
             case DrawSettings.BMS_SOC: return v.soc() < 0 ? "--" : v.soc() + "%";
             case DrawSettings.PRESSURE: return v.pressureMv() < 0 ? "--" : v.pressureMv() + " mV";
+            case DrawSettings.BMS_REMAINING_AH: return Float.isNaN(v.remainingAh()) ? "--" : String.format(Locale.ROOT, "%.1f Ah", v.remainingAh());
             default: return "";
         }
     }
     /** A stable stamp of what the picture shows, so unchanged frames are handed back to the encoder untouched. */
     public static int stamp(DrawSettings settings, Values v, boolean dark) {
         return Objects.hash(settings, dark, Math.round(v.speedKmh() * 10), Math.round(v.watts()), Math.round(v.volts() * 10), v.soc(),
-                Math.round(v.frontBar() * 10), Math.round(v.rearBar() * 10),v.pressureMv());
+                Math.round(v.remainingAh() * 10), Math.round(v.frontBar() * 10), Math.round(v.rearBar() * 10),v.pressureMv());
     }
 }
