@@ -105,6 +105,10 @@ final class BmsTests {
         byte[] badJbd=basic.clone();badJbd[badJbd.length-1]^=1;
         CoreTests.check(jbd.accept(badJbd,1430)==null,"a JBD frame with a wrong checksum is dropped");
         BmsData k=jk.accept(jkStatus(1500),1500);
+        JkBmsProtocol jk14=new JkBmsProtocol();
+        BmsData k14=jk14.accept(jk14Status(1550),1550);
+        CoreTests.check(java.util.Objects.nonNull(k14)&&k14.cells()==14&&k14.cellMv().length==14&&near(k14.volts(),44.8f),
+                "JK pack voltage identifies fourteen real cells and excludes six plausible unused slots");
         CoreTests.check(k!=null&&k.cells()==24&&near(k.volts(),79.2f)&&k.soc()==77,
                 "JK status notifications use the 55 AA EB 90 response header");
         BmsData y=yy.accept(yyStatus(1800),1800);
@@ -168,6 +172,14 @@ final class BmsTests {
         put16(f,140,0);f[141]=77;put32(f,142,50000L);put32(f,146,100000L);put32(f,150,12L);put32(f,154,250000L);
         f[158]=99;f[166]=1;f[167]=1;
         put16(f,222,(short)-1000);put16(f,224,(short)-1000);put16(f,226,(short)-1000);
+        int sum=0;for(int i=0;i<299;i++)sum+=f[i]&0xff;f[299]=(byte)sum;
+        return f;
+    }
+    private static byte[] jk14Status(long at){
+        byte[] f=jkStatus(at);
+        for(int i=0;i<6;i++)put16(f,6+2*i,3300);
+        for(int i=6;i<20;i++)put16(f,6+2*i,3200);
+        put32(f,118,44800L);
         int sum=0;for(int i=0;i<299;i++)sum+=f[i]&0xff;f[299]=(byte)sum;
         return f;
     }

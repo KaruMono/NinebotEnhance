@@ -71,6 +71,20 @@ public final class JkBmsProtocol extends BufferedBmsProtocol {
         score+=Math.abs(sum-Math.round(volts*1000))<=Math.max(2000,Math.round(volts*80))?8:-8;
         return score;
     }
+    private static int matchingCellRange(int[] cells,int count,long packMv){
+        if(count<2||packMv<1000||packMv>100000)return 0;
+        long bestError=Long.MAX_VALUE;int bestStart=0,bestCount=0;
+        for(int start=0;start<count-1;start++){
+            long sum=0;
+            for(int end=start;end<count;end++){
+                sum+=cells[end];
+                if(end-start+1<2)continue;
+                long error=Math.abs(sum-packMv);
+                if(error<bestError){bestError=error;bestStart=start;bestCount=end-start+1;}
+            }
+        }
+        return bestError<=Math.max(2000L,packMv/20)?(bestStart<<8)|bestCount:0;
+    }
     private BmsData status(long now){
         int late=layout==0?0:32,slots=layout==0?24:32;
         int[] cell=new int[slots];int used=0;
@@ -80,6 +94,8 @@ public final class JkBmsProtocol extends BufferedBmsProtocol {
             cell[used++]=mv;
         }
         int[] cells=Arrays.copyOf(cell,used);
+        int range=matchingCellRange(cells,used,u32(buffer,118+late));
+        if(range>0)cells=Arrays.copyOfRange(cells,range>>>8,(range>>>8)+(range&0xff));
         CellStats stats=statistics(cells,cells.length);
         float volts=u32(buffer,118+late)/1000f,amps=-s32(buffer,126+late)/1000f;
         if(volts<1||volts>1000||Math.abs(amps)>5000)return null;
