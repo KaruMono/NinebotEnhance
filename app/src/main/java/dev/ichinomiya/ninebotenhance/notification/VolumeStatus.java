@@ -16,7 +16,8 @@ public final class VolumeStatus {
     private static final String CHANGED="android.media.VOLUME_CHANGED_ACTION",STREAM="android.media.EXTRA_VOLUME_STREAM_TYPE",
             VALUE="android.media.EXTRA_VOLUME_STREAM_VALUE",PREVIOUS="android.media.EXTRA_PREV_VOLUME_STREAM_VALUE";
     private final AudioManager audio;private int stream=AudioManager.STREAM_MUSIC,level=-1,max=15,polledMusic=-1;private long seq,changedAt;
-    private final Interceptor interceptor;private int restoringTo=-1;private long restoringAt;
+    private final Interceptor interceptor;private int restoringTo=-1,restoringBaseline=-1;private long restoringAt,restoreGeneration;
+    private final Handler restoreHandler=new Handler(Looper.getMainLooper());
     /** Volume the current press burst started at; every held repeat restores to this same anchor instead of the drifting per-event previous. */
     private int baseline=-1;private long burstAt;private static final long BURST_GAP_MS=900;
     public VolumeStatus(Context context){this(context,up->false);}
@@ -69,10 +70,19 @@ public final class VolumeStatus {
             if(after!=baseline){audio.setStreamVolume(AudioManager.STREAM_MUSIC,baseline,0);after=audio.getStreamVolume(AudioManager.STREAM_MUSIC);}
         }catch(RuntimeException e){android.util.Log.i("NinebotEnhance","LAMP volume restore failed "+e);}
         int landed=after<0?baseline:after;
-        synchronized(this){restoringTo=landed;restoringAt=SystemClock.elapsedRealtime();polledMusic=landed;}
+        final long generation;
+        synchronized(this){restoringTo=landed;restoringBaseline=baseline;restoringAt=SystemClock.elapsedRealtime();polledMusic=landed;generation=++restoreGeneration;}
         android.util.Log.i("NinebotEnhance","LAMP volume restored to "+landed+" wanted "+baseline);
+        restoreHandler.postDelayed(()->verifyRestore(generation,baseline),120);
+        restoreHandler.postDelayed(()->verifyRestore(generation,baseline),420);
+    }
+    private void verifyRestore(long generation,int wanted){
+        synchronized(this){if(generation!=restoreGeneration||restoringBaseline!=wanted)return;}
+        try{int current=audio.getStreamVolume(AudioManager.STREAM_MUSIC);if(current!=wanted){audio.setStreamVolume(AudioManager.STREAM_MUSIC,wanted,0);synchronized(this){polledMusic=wanted;restoringTo=wanted;restoringAt=SystemClock.elapsedRealtime();}android.util.Log.i("NinebotEnhance","LAMP volume rechecked "+current+"->"+wanted);}}
+        catch(RuntimeException e){android.util.Log.i("NinebotEnhance","LAMP volume recheck failed "+e);}
     }
     private synchronized void record(int type,int value){
+        if(type==AudioManager.STREAM_MUSIC){restoreGeneration++;restoringBaseline=-1;}
         if(audio==null)return;
         int limit;try{limit=Math.max(1,audio.getStreamMaxVolume(type));}catch(RuntimeException e){limit=max;}
         stream=type;level=Math.max(0,Math.min(limit,value));max=limit;seq++;changedAt=SystemClock.elapsedRealtime();
