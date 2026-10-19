@@ -45,6 +45,8 @@ public final class VehicleCardInjector {
     private final WeakHashMap<View, Boolean> ownershipLabels = new WeakHashMap<>();
     private final WeakHashMap<View, Row> rows = new WeakHashMap<>();
     private WeakReference<View> navigationCard = new WeakReference<>(null);
+    /** The location layout root supplied by LayoutInflater; unlike its internal map ids, this is stable across vehicle variants. */
+    private WeakReference<View> locationCard = new WeakReference<>(null);
     private final DirectCastController controller;
     private final FrameClient frames;
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -55,6 +57,7 @@ public final class VehicleCardInjector {
     /** Either card inflating is the earliest moment the page can be walked; the periodic walk covers everything else. */
     public void inflated(String layout, View view) {
         if (!LOCATION_CARD.equals(layout) && !LOCATION_ITEM.equals(layout) && !NAVIGATION_CARD.equals(layout)) return;
+        if (LOCATION_CARD.equals(layout)) locationCard = new WeakReference<>(view);
         Activity activity = activity(view.getContext());
         if (activity != null) view.post(() -> scanPage(activity));
     }
@@ -78,7 +81,10 @@ public final class VehicleCardInjector {
     }
     private void scan(View root) {
         if (root == null) return;
-        View navigation = null, history = null, location = null;
+        View navigation = null, history = null;
+        View knownLocation = locationCard.get();
+        boolean inflatedLocation = knownLocation != null && knownLocation.isAttachedToWindow() && knownLocation.getRootView() == root;
+        View location = inflatedLocation ? topLevelCard(knownLocation) : null;
         ArrayDeque<View> queue = new ArrayDeque<>(); queue.add(root);
         for (int count = 0; !queue.isEmpty() && count < SCAN_BUDGET; count++) {
             View view = queue.removeFirst();
@@ -102,7 +108,8 @@ public final class VehicleCardInjector {
             }
         }
         navigationCard = new WeakReference<>(navigation);
-        String found = "navigation=" + (navigation != null) + " location=" + (location != null);
+        String found = "navigation=" + (navigation != null) + " location=" + (location != null)
+                + " source=" + (inflatedLocation ? "layout" : "scan") + " parent=" + parentName(location);
         if (!found.equals(lastAnchor)) { lastAnchor = found; frames.report("DIRECT UI " + found); }
         Row live = liveRow(root);
         if (navigation != null && navigation.isShown()) {
@@ -124,7 +131,7 @@ public final class VehicleCardInjector {
         return false;
     }
     private static View topLevelCard(View marker) {
-        View child = marker, fallback = null;
+        View child = marker, fallback = marker.getParent() instanceof LinearLayout ? marker : null;
         for (ViewParent p = marker.getParent(); p instanceof View; p = ((View)p).getParent()) {
             View parent = (View)p;
             boolean column = parent instanceof LinearLayout && ((LinearLayout)parent).getOrientation() == LinearLayout.VERTICAL;
@@ -133,6 +140,10 @@ public final class VehicleCardInjector {
             child = parent;
         }
         return fallback;
+    }
+    private static String parentName(View view) {
+        if (view == null || view.getParent() == null) return "none";
+        return view.getParent().getClass().getSimpleName();
     }
     private static boolean scrollView(ViewParent parent) {
         for (Class<?> type = parent == null ? null : parent.getClass(); type != null; type = type.getSuperclass())
