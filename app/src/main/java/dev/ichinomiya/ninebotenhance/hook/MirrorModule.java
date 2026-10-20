@@ -135,6 +135,19 @@ public final class MirrorModule extends XposedModule {
             });
         } catch (Throwable e) { log(Log.ERROR, Protocol.TAG, "Application attach hook failed", e); }
         try {
+            hook(LayoutInflater.class.getDeclaredMethod("inflate", int.class, ViewGroup.class)).intercept(chain -> {
+                ViewGroup root = (ViewGroup)chain.getArg(1);
+                int previousChildren = root == null ? 0 : root.getChildCount();
+                Object result = chain.proceed();
+                try {
+                    View inflated = result instanceof View ? (View)result : null;
+                    if (root != null && root.getChildCount() > previousChildren) inflated = root.getChildAt(previousChildren);
+                    if (inflated != null) direct.inflated((int)chain.getArg(0), inflated);
+                } catch (RuntimeException e) { frames.report("DIRECT inflate observer " + e.getClass().getSimpleName()); }
+                return result;
+            });
+        } catch (Throwable e) { frames.report("DIRECT entry hook 2arg unavailable " + e.getClass().getSimpleName()); }
+        try {
             hook(LayoutInflater.class.getDeclaredMethod("inflate", int.class, ViewGroup.class, boolean.class)).intercept(chain -> {
                 ViewGroup root = (ViewGroup)chain.getArg(1);
                 boolean attach = (boolean)chain.getArg(2);
