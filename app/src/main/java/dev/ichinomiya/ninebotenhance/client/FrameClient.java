@@ -36,6 +36,7 @@ import dev.ichinomiya.ninebotenhance.client.AppIconLoader;
 import android.content.*;
 import android.app.Activity;
 import android.app.ActivityOptions;
+import android.app.KeyguardManager;
 import android.app.PendingIntent;
 import android.graphics.*;
 import android.media.*;
@@ -73,6 +74,9 @@ public final class FrameClient {
     private final ArrayDeque<String> reports = new ArrayDeque<>();
     private final Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG);
     private final Paint overlayText = new Paint(Paint.ANTI_ALIAS_FLAG), overlayBack = new Paint();
+    private final Paint lockShade = new Paint(), lockDate = new Paint(Paint.ANTI_ALIAS_FLAG), lockTime = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final java.text.SimpleDateFormat lockDateFormat = new java.text.SimpleDateFormat("M月d日  EEEE", java.util.Locale.CHINA);
+    private final java.text.SimpleDateFormat lockTimeFormat = new java.text.SimpleDateFormat("HH:mm", java.util.Locale.ROOT);
     private record FrameStamp(int picture, long hud) {}
     private final Map<Bitmap, FrameStamp> supplied = new WeakHashMap<>();
     private final dev.ichinomiya.ninebotenhance.notification.DashboardHud hud = new dev.ichinomiya.ninebotenhance.notification.DashboardHud();
@@ -144,7 +148,11 @@ public final class FrameClient {
     private final Paint markFill = new Paint(Paint.ANTI_ALIAS_FLAG), markRing = new Paint(Paint.ANTI_ALIAS_FLAG), markOutline = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint targetText = new Paint(Paint.ANTI_ALIAS_FLAG), targetHalo = new Paint(Paint.ANTI_ALIAS_FLAG);
     { markFill.setColor(Color.WHITE); markRing.setColor(Color.WHITE); markRing.setStyle(Paint.Style.STROKE); markOutline.setColor(Color.BLACK); markOutline.setStyle(Paint.Style.STROKE);
-      targetText.setColor(Color.WHITE); targetHalo.setColor(Color.BLACK); targetHalo.setStyle(Paint.Style.STROKE); }
+      targetText.setColor(Color.WHITE); targetHalo.setColor(Color.BLACK); targetHalo.setStyle(Paint.Style.STROKE);
+      lockShade.setColor(Color.argb(142, 0, 0, 0));
+      lockDate.setColor(Color.argb(235, 242, 242, 242)); lockDate.setTextAlign(Paint.Align.CENTER);
+      lockTime.setColor(Color.argb(245, 246, 246, 246)); lockTime.setTextAlign(Paint.Align.CENTER);
+      lockTime.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL)); }
     /** The module reports whether a touch panel is bound and whether the daemon has it open right now; calibration runs from the preview toolbar while a session is live. */
     private volatile boolean touchBound, touchPresent, calibrating;
     private int calibrationStep;
@@ -867,6 +875,26 @@ public final class FrameClient {
             catch (Exception e) { report("STOP pending retry " + Ipc.error(e)); return; }
         }
     }
+    private boolean phoneLocked() {
+        Context app = context;
+        if (app == null) return false;
+        KeyguardManager keyguard = (KeyguardManager) app.getSystemService(Context.KEYGUARD_SERVICE);
+        return keyguard != null && keyguard.isKeyguardLocked();
+    }
+
+    /** Keeps the last application frame visible behind a restrained, readable lock-screen clock. */
+    private void drawLockScreen(Canvas canvas, int width, int height) {
+        if (!savedSource.virtual() || !phoneLocked()) return;
+        long now = System.currentTimeMillis();
+        float scale = Math.max(0.75f, Math.min(width, height) / 320f);
+        lockDate.setTextSize(18f * scale);
+        lockTime.setTextSize(Math.max(64f, Math.min(width * 0.46f, height * 0.30f)));
+        canvas.drawRect(0, 0, width, height, lockShade);
+        float center = height * 0.48f;
+        canvas.drawText(lockDateFormat.format(new Date(now)), width * 0.5f, center - lockTime.getTextSize() * 0.72f, lockDate);
+        canvas.drawText(lockTimeFormat.format(new Date(now)), width * 0.5f, center + lockTime.getTextSize() * 0.28f, lockTime);
+    }
+
     public boolean draw(Canvas canvas, int width, int height) {
         synchronized (frameLock) {
             if (!casting || !ready() || width < 1 || height < 1 || (long)width * height > 4096L * 2160) return false;
@@ -882,6 +910,7 @@ public final class FrameClient {
                     // Cards, touch marks and the calibration target belong to the virtual display; the capture is passed through as it is.
                     if(!debug&&savedSource.virtual()){int overlaySave=canvas.save();canvas.translate(r[0],r[1]);hud.draw(canvas,Math.round(r[2]-r[0]),Math.round(r[3]-r[1]),SystemClock.elapsedRealtime());drawTouchMarks(canvas,Math.round(r[2]-r[0]),SystemClock.elapsedRealtime());drawCalibrationTarget(canvas,Math.round(r[2]-r[0]),Math.round(r[3]-r[1]));canvas.restoreToCount(overlaySave);}
                 }
+                drawLockScreen(canvas, width, height);
             } finally { canvas.restoreToCount(saved); }
             replacements++; if (streamStats != null) streamStats.replaced(); return true;
         }
@@ -905,7 +934,9 @@ public final class FrameClient {
     public DisplaySettings cachedSettings() { return savedSettings; }
     private FrameStamp stamp() {
         long now = SystemClock.elapsedRealtime();
-        return new FrameStamp(pictureRevision, debugMode.enabled() ? 0 : drawing ? dev.ichinomiya.ninebotenhance.notification.DrawPanel.stamp(drawSettings, drawValues(now), dashboardDark) : hud.revision(now));
+        long overlay = debugMode.enabled() ? 0 : drawing ? dev.ichinomiya.ninebotenhance.notification.DrawPanel.stamp(drawSettings, drawValues(now), dashboardDark) : hud.revision(now);
+        if (savedSource.virtual() && phoneLocked()) overlay = overlay * 31L + (System.currentTimeMillis() / 60000L);
+        return new FrameStamp(pictureRevision, overlay);
     }
     /** Opens the module's own lamp screen; its Bluetooth permissions belong to the module, not to Ninebot. */
     public void lampSettings(Activity activity, boolean dark) {

@@ -46,8 +46,13 @@ public final class Ipc {
     public static Bundle launchOptions() {
         if (Build.VERSION.SDK_INT < 34) return null;
         android.app.ActivityOptions options = android.app.ActivityOptions.makeBasic();
-        options.setPendingIntentBackgroundActivityStartMode(Build.VERSION.SDK_INT >= 36
-                ? android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_IF_VISIBLE : android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED);
+        int mode = android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED;
+        if (Build.VERSION.SDK_INT >= 36) {
+            try {
+                mode = android.app.ActivityOptions.class.getField("MODE_BACKGROUND_ACTIVITY_START_ALLOW_IF_VISIBLE").getInt(null);
+            } catch (ReflectiveOperationException ignored) { }
+        }
+        options.setPendingIntentBackgroundActivityStartMode(mode);
         return options.toBundle();
     }
     public static String error(Throwable error) {
