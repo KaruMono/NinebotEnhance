@@ -57,6 +57,7 @@ import dev.ichinomiya.ninebotenhance.core.BmsCard;
 import dev.ichinomiya.ninebotenhance.core.DashboardLayout;
 import dev.ichinomiya.ninebotenhance.core.DashboardProfile;
 import dev.ichinomiya.ninebotenhance.core.HiddenFeatures;
+import dev.ichinomiya.ninebotenhance.core.LockScreenSettings;
 import dev.ichinomiya.ninebotenhance.diagnostics.EncodingDiagnostics;
 
 /** Ninebot owns the consumer Surface: compositor -> RGBA -> original encoder. No JPEG IPC. */
@@ -100,6 +101,7 @@ public final class FrameClient {
     private volatile WidgetSettings widgets=WidgetSettings.DEFAULT;
     private volatile EncoderOverride encoderOverride=EncoderOverride.NONE;
     private volatile HiddenFeatures hiddenFeatures=HiddenFeatures.NONE;
+    private volatile LockScreenSettings lockScreenSettings=LockScreenSettings.DEFAULT;
     private volatile DashboardLayout dashboardLayout=DashboardLayout.DEFAULT;
     private volatile String layoutVehicle="";
     private volatile java.util.function.Consumer<EncoderOverride> overrideApplier=o->{};
@@ -275,6 +277,7 @@ public final class FrameClient {
                 drawSettings=DrawSettings.read(saved::getInt);
                 encoderOverride=new EncoderOverride(saved.getInt("encoder_bitrate_kbps",0),saved.getInt("encoder_fps",0),saved.getBoolean("preview_stats",false),saved.getInt("encoder_frame_width",0),saved.getInt("encoder_frame_height",0));
                 hiddenFeatures=new HiddenFeatures(saved.getBoolean("unhide_throttle",false),saved.getBoolean("unhide_hardkey",false),saved.getBoolean("unhide_cruise",false));
+                lockScreenSettings=LockScreenSettings.read(saved);
                 naviTest=false;
                 naviLive=saved.getBoolean("navi_live",true);
                 bmsLayout=BmsCard.parse(saved.getString("bms_layout",""));hud.setBmsLayout(bmsLayout);
@@ -362,6 +365,14 @@ public final class FrameClient {
     public EncoderOverride encoderOverride(){return encoderOverride;}
     /** Ninebot settings entries forced visible by the feature hooks. */
     public HiddenFeatures hiddenFeatures(){return hiddenFeatures;}
+    public LockScreenSettings lockScreenSettings(){return lockScreenSettings;}
+    public void saveLockScreenSettings(LockScreenSettings value){
+        if (value == null) return;
+        lockScreenSettings=value;
+        if(context != null) value.save(context.getSharedPreferences(Protocol.MODULE+".widgets",Context.MODE_PRIVATE).edit());
+        report("LOCKSCREEN settings saved time="+value.showTime()+" refresh="+value.keepAppRefreshing()+" dim="+value.dimBackground());
+        View preview=inlinePreview.get(); if(preview != null) preview.postInvalidateOnAnimation();
+    }
     public void saveHiddenFeatures(HiddenFeatures value){
         hiddenFeatures=value;
         if(context!=null)context.getSharedPreferences(Protocol.MODULE+".widgets",Context.MODE_PRIVATE).edit().putBoolean("unhide_throttle",value.throttle()).putBoolean("unhide_hardkey",value.hardkey()).putBoolean("unhide_cruise",value.cruise()).apply();
@@ -582,6 +593,7 @@ public final class FrameClient {
             if(lastImage==0)report("RGBA first frame "+frameWidth+"x"+frameHeight+" content="+width+"x"+height+" position=0,"+(frameHeight-height)+" source="+(screenCapture?"MediaProjection":"VirtualDisplay"));
             synchronized (frameLock) {
                 latest = bitmap;
+                pictureRevision++;
                 if (!phoneDisplayLocked()) lastUnlocked = bitmap;
                 lastImage = now;
             }
@@ -909,7 +921,8 @@ public final class FrameClient {
 
     /** Dims the captured app with a top/bottom black gradient and leaves only the clock visible. */
     private void drawLockScreen(Canvas canvas, int width, int height) {
-        if (!savedSource.virtual() || !phoneDisplayLocked()) return;
+        LockScreenSettings lock = lockScreenSettings;
+        if (!savedSource.virtual() || !phoneDisplayLocked() || !lock.dimBackground()) return;
         long now = System.currentTimeMillis();
         float scale = Math.max(0.75f, Math.min(width, height) / 320f);
         lockTime.setTextSize(Math.max(64f, Math.min(width * 0.46f, height * 0.30f)));
@@ -919,9 +932,11 @@ public final class FrameClient {
                 new float[]{0f, 0.22f, 0.50f, 0.78f, 1f}, Shader.TileMode.CLAMP));
         canvas.drawRect(0, 0, width, height, lockShade);
         lockShade.setShader(null);
-        float center = height * 0.50f;
-        canvas.drawText(lockTimeFormat.format(new Date(now)), width * 0.5f,
-                center - (lockTime.ascent() + lockTime.descent()) * 0.5f, lockTime);
+        if (lock.showTime()) {
+            float center = height * 0.50f;
+            canvas.drawText(lockTimeFormat.format(new Date(now)), width * 0.5f,
+                    center - (lockTime.ascent() + lockTime.descent()) * 0.5f, lockTime);
+        }
     }
 
     public boolean draw(Canvas canvas, int width, int height) {
@@ -933,7 +948,8 @@ public final class FrameClient {
                 if (drawing && !debug) {
                     drawPanel.draw(canvas, width, height, HudPalette.of(dashboardDark), settings.background(dashboardDark), drawSettings, drawValues(SystemClock.elapsedRealtime()));
                 } else {
-                    Bitmap picture = debug ? calibrationFrame() : (phoneDisplayLocked() && lastUnlocked != null ? lastUnlocked : latest);
+                    LockScreenSettings lock = lockScreenSettings;
+                    Bitmap picture = debug ? calibrationFrame() : (phoneDisplayLocked() && (!lock.keepAppRefreshing() || latest == null) && lastUnlocked != null ? lastUnlocked : latest);
                     if (picture == null || picture.isRecycled()) return false;
                     float[] r = debug ? new float[]{0, 0, width, height} : Geometry.fit(picture.getWidth(), picture.getHeight(), width, height);
                     canvas.drawBitmap(picture, null, new RectF(r[0], r[1], r[2], r[3]), paint);
@@ -965,7 +981,11 @@ public final class FrameClient {
     private FrameStamp stamp() {
         long now = SystemClock.elapsedRealtime();
         long overlay = debugMode.enabled() ? 0 : drawing ? dev.ichinomiya.ninebotenhance.notification.DrawPanel.stamp(drawSettings, drawValues(now), dashboardDark) : hud.revision(now);
-        if (savedSource.virtual() && phoneDisplayLocked()) overlay = overlay * 31L + (System.currentTimeMillis() / 60000L);
+        if (savedSource.virtual() && phoneDisplayLocked()) {
+            LockScreenSettings lock = lockScreenSettings;
+            overlay = overlay * 31L + (lock.keepAppRefreshing() ? (SystemClock.elapsedRealtime() / 100L) : 0L);
+            if (lock.showTime()) overlay = overlay * 31L + (System.currentTimeMillis() / 60000L);
+        }
         return new FrameStamp(pictureRevision, overlay);
     }
     /** Opens the module's own lamp screen; its Bluetooth permissions belong to the module, not to Ninebot. */
