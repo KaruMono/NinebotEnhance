@@ -137,8 +137,10 @@ public final class FrameClient {
     private final FramePacer framePacer = new FramePacer(); // Accessed only on the frame worker.
     private Runnable pendingImageRead;
     private ByteBuffer packed;
-    private volatile Bitmap latest;
+    private volatile Bitmap latest, lastUnlocked;
     private volatile long lastImage, replacements, earlyFrames, deduplicated;
+    /** Binder/status polling can pause briefly while the phone changes power state; keep the cast alive through that gap. */
+    private static final long SESSION_LIVENESS_GRACE_MS = 15000L;
     private long lastStats;
     private volatile StreamStats streamStats;
     private final EncodingDiagnostics encoding = new EncodingDiagnostics(this::report);
@@ -578,7 +580,11 @@ public final class FrameClient {
             }
             bitmap.setDensity(Bitmap.DENSITY_NONE);
             if(lastImage==0)report("RGBA first frame "+frameWidth+"x"+frameHeight+" content="+width+"x"+height+" position=0,"+(frameHeight-height)+" source="+(screenCapture?"MediaProjection":"VirtualDisplay"));
-            synchronized (frameLock) { latest = bitmap; lastImage = now; }
+            synchronized (frameLock) {
+                latest = bitmap;
+                if (!phoneDisplayLocked()) lastUnlocked = bitmap;
+                lastImage = now;
+            }
             framePacer.captured(now);
             if (samples != null) samples.captured(now);
             View preview = inlinePreview.get(); if (preview != null) preview.postInvalidateOnAnimation();
@@ -693,7 +699,7 @@ public final class FrameClient {
         framePacer.reset();
         if (reader != null) { reader.setOnImageAvailableListener(null, null); reader.close(); reader = null; }
         packed = null;
-        synchronized (frameLock) { latest = null; calibration = null; lastImage = 0; supplied.clear(); }
+        synchronized (frameLock) { latest = null; lastUnlocked = null; calibration = null; lastImage = 0; supplied.clear(); }
         View preview = inlinePreview.get(); if (preview != null) preview.postInvalidateOnAnimation();
     }
     /** Whether one of the host's screens is visible; the module holds its lamp and BMS links only while it is or a session runs. */
@@ -849,9 +855,13 @@ public final class FrameClient {
     }
     public long replacementCount() { synchronized (frameLock) { return replacements; } }
     public boolean readyFor(String request) { synchronized (frameLock) { return request.equals(ownerRequest) && ready(); } }
-    public boolean captureActiveFor(String request) { return request.equals(ownerRequest) && active && SystemClock.elapsedRealtime() - lastPoll < 4000; }
+    private boolean pollAlive() {
+        long age = SystemClock.elapsedRealtime() - lastPoll;
+        return age < (phoneDisplayLocked() ? SESSION_LIVENESS_GRACE_MS : 4000L);
+    }
+    public boolean captureActiveFor(String request) { return request.equals(ownerRequest) && active && pollAlive(); }
     public boolean failedFor(String request) { return request.equals(ownerRequest) && !active && lastPoll != 0; }
-    private boolean ready() { return active && displayReady && (debugMode.enabled() || latest != null || drawing) && SystemClock.elapsedRealtime() - lastPoll < 4000; }
+    private boolean ready() { return active && displayReady && (debugMode.enabled() || latest != null || drawing) && pollAlive(); }
     public void stopDirect(String request) {
         synchronized (observationLock) {
             if (request != null && request.equals(observedRequest)) {
@@ -923,7 +933,8 @@ public final class FrameClient {
                 if (drawing && !debug) {
                     drawPanel.draw(canvas, width, height, HudPalette.of(dashboardDark), settings.background(dashboardDark), drawSettings, drawValues(SystemClock.elapsedRealtime()));
                 } else {
-                    Bitmap picture = debug ? calibrationFrame() : latest;
+                    Bitmap picture = debug ? calibrationFrame() : (phoneDisplayLocked() && lastUnlocked != null ? lastUnlocked : latest);
+                    if (picture == null || picture.isRecycled()) return false;
                     float[] r = debug ? new float[]{0, 0, width, height} : Geometry.fit(picture.getWidth(), picture.getHeight(), width, height);
                     canvas.drawBitmap(picture, null, new RectF(r[0], r[1], r[2], r[3]), paint);
                     // Keep the captured app clean while the phone is locked; the lock layer supplies the clock.
