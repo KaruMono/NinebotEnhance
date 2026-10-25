@@ -232,7 +232,14 @@ public final class FrameBridgeService extends Service {
         }
     };
     @Override public void onCreate() {
-        super.onCreate(); PrivilegeManager.initialize(this);
+        super.onCreate();
+        PrivilegeManager.initialize(this);
+        // Detect an already-authorized Shizuku binder immediately. For Root, use the
+        // existing verified su handshake; it may show the manager's normal prompt.
+        new Handler(Looper.getMainLooper()).post(() -> {
+            try { PrivilegeManager.prepareStart(FrameBridgeService.this); }
+            catch (RuntimeException e) { Diagnostics.add("PRIVILEGE automatic check deferred: " + e.getClass().getSimpleName()); }
+        });
         dev.ichinomiya.ninebotenhance.navi.NaviLoopbackServer.start();
         Diagnostics.add("SERVICE created pid=" + android.os.Process.myPid());
     }

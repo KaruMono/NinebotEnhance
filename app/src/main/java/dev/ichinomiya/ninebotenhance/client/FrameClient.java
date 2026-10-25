@@ -940,6 +940,15 @@ public final class FrameClient {
     }
 
     public boolean draw(Canvas canvas, int width, int height) {
+        return draw(canvas, width, height, false);
+    }
+
+    /**
+     * The encoder replacement is the single owner of the lock overlay. Preview and
+     * nested encoder callbacks must render the app layer only, otherwise the clock
+     * is composited twice when both paths observe the same frame.
+     */
+    private boolean draw(Canvas canvas, int width, int height, boolean includeLockOverlay) {
         synchronized (frameLock) {
             if (!casting || !ready() || width < 1 || height < 1 || (long)width * height > 4096L * 2160) return false;
             boolean debug = debugMode.enabled();
@@ -956,7 +965,7 @@ public final class FrameClient {
                     // Keep the captured app clean while the phone is locked; the lock layer supplies the clock.
                     if(!debug&&savedSource.virtual()&&!phoneDisplayLocked()){int overlaySave=canvas.save();canvas.translate(r[0],r[1]);hud.draw(canvas,Math.round(r[2]-r[0]),Math.round(r[3]-r[1]),SystemClock.elapsedRealtime());drawTouchMarks(canvas,Math.round(r[2]-r[0]),SystemClock.elapsedRealtime());drawCalibrationTarget(canvas,Math.round(r[2]-r[0]),Math.round(r[3]-r[1]));canvas.restoreToCount(overlaySave);}
                 }
-                drawLockScreen(canvas, width, height);
+                if (includeLockOverlay) drawLockScreen(canvas, width, height);
             } finally { canvas.restoreToCount(saved); }
             replacements++; if (streamStats != null) streamStats.replaced(); return true;
         }
@@ -965,7 +974,7 @@ public final class FrameClient {
         synchronized (frameLock) {
             if (!casting || !ready() || width <= 0 || height <= 0 || (long)width * height > 4096L * 2160) return null;
             Bitmap output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888); output.setDensity(density);
-            if (!draw(new Canvas(output), width, height)) { output.recycle(); return null; }
+            if (!draw(new Canvas(output), width, height, true)) { output.recycle(); return null; }
             supplied.put(output, stamp()); if (early) earlyFrames++;
             return output; // Encoder owns this object; never recycle or overwrite it from the producer.
         }
