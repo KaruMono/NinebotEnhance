@@ -56,7 +56,44 @@ public final class ModuleActivity extends Activity {
         ScrollView scroll = new ScrollView(this); scroll.addView(root); scroll.setBackgroundColor(theme.surface);
         setContentView(scroll);
     }
-    @Override protected void onResume() { super.onResume(); refresh(); }
+    @Override protected void onResume() {
+        super.onResume();
+        refresh();
+        autoPreparePrivilege();
+    }
+    /** Detect an already-authorized backend on entry; Root checks may show the manager's normal consent prompt. */
+    private void autoPreparePrivilege() {
+        main.postDelayed(() -> {
+            if (isFinishing() || rows == null) return;
+            try {
+                Bundle state = PrivilegeManager.status(this);
+                if (!state.getBoolean("start_allowed") && state.getBoolean("root_pending")) {
+                    main.postDelayed(this::autoPreparePrivilege, 700);
+                    return;
+                }
+                if (!state.getBoolean("start_allowed") && state.getBoolean("privilege_granted")) {
+                    refresh();
+                    return;
+                }
+                if (!state.getBoolean("start_allowed") && state.getBoolean("root_ready")) {
+                    refresh();
+                    return;
+                }
+                if (!state.getBoolean("start_allowed") && "SHIZUKU".equals(state.getString("privilege_mode"))
+                        && state.getBoolean("privilege_supported") && !state.getBoolean("privilege_granted")
+                        && !state.getBoolean("privilege_pending")) {
+                    // Do not silently grant Shizuku: the user must confirm its system dialog.
+                    refresh();
+                    return;
+                }
+                if (!state.getBoolean("start_allowed") && state.getBoolean("root_ready")) refresh();
+                else if (!state.getBoolean("start_allowed")) PrivilegeManager.prepareStart(this);
+                main.postDelayed(this::refresh, 900);
+            } catch (RuntimeException ignored) {
+                // The permission rows remain the source of truth when a backend is unavailable.
+            }
+        }, 120);
+    }
     @Override protected void onPause() { super.onPause(); if (rows != null) rows.stop(); }
     @Override public void onRequestPermissionsResult(int code, String[] names, int[] grants) { super.onRequestPermissionsResult(code, names, grants); refresh(); }
     private void refresh() { if (rows != null) rows.fill(true); }
