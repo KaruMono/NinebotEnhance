@@ -859,6 +859,11 @@ public final class FrameClient {
     public void summary(String value) { summary = value; }
     public String status() { return bridge.status() + "\n" + state + "\n" + summary; }
     public boolean serviceConnected() { return bridge.connected(); }
+    /** Lock-screen presentation is meaningful only while the configured virtual display is actually alive. */
+    public boolean virtualDisplayAvailable() {
+        return savedSource.virtual() && active && displayReady && beginAccepted != null
+                && bridge.connected() && pollAlive();
+    }
     public String serviceStatus() { return bridge.status(); }
     public String serviceAdvice() { return bridge.advice(); }
     /** The module's cached GitHub release lookup; {@code refresh} asks it to look again now. */
