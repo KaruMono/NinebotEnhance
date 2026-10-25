@@ -58,8 +58,10 @@ public final class HiddenFeatureDialog {
         LockScreenSettings current = frames.lockScreenSettings();
         LinearLayout content = page(activity, theme);
         CheckBox time = check(activity, theme, content, "显示时间", current.showTime());
+        CheckBox date = check(activity, theme, content, "显示日期", current.showDate());
+        CheckBox temperature = check(activity, theme, content, "显示温度", current.showTemperature());
+        CheckBox temperatureUnit = check(activity, theme, content, "显示温度符号", current.showTemperatureUnit());
         CheckBox refresh = check(activity, theme, content, "锁屏后持续刷新应用内容", current.keepAppRefreshing());
-        CheckBox dim = check(activity, theme, content, "显示半透明暗背景", current.dimBackground());
         AlertDialog dialog = new AlertDialog.Builder(activity)
                 .setTitle("锁屏显示选项")
                 .setView(content)
@@ -70,7 +72,8 @@ public final class HiddenFeatureDialog {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(theme.accent);
             dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(theme.accent);
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
-                frames.saveLockScreenSettings(new LockScreenSettings(time.isChecked(), refresh.isChecked(), dim.isChecked()));
+                frames.saveLockScreenSettings(new LockScreenSettings(time.isChecked(), refresh.isChecked(), true,
+                        date.isChecked(), temperature.isChecked(), temperatureUnit.isChecked()));
                 dialog.dismiss();
             });
         });

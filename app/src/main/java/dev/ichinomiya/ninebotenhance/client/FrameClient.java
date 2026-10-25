@@ -75,7 +75,7 @@ public final class FrameClient {
     private final ArrayDeque<String> reports = new ArrayDeque<>();
     private final Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG);
     private final Paint overlayText = new Paint(Paint.ANTI_ALIAS_FLAG), overlayBack = new Paint();
-    private final Paint lockShade = new Paint(Paint.ANTI_ALIAS_FLAG), lockDate = new Paint(Paint.ANTI_ALIAS_FLAG), lockTime = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint lockShade = new Paint(Paint.ANTI_ALIAS_FLAG), lockDate = new Paint(Paint.ANTI_ALIAS_FLAG), lockTime = new Paint(Paint.ANTI_ALIAS_FLAG), lockTemperature = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final java.text.SimpleDateFormat lockDateFormat = new java.text.SimpleDateFormat("M月d日  EEEE", java.util.Locale.CHINA);
     private final java.text.SimpleDateFormat lockTimeFormat = new java.text.SimpleDateFormat("HH:mm", java.util.Locale.ROOT);
     private record FrameStamp(int picture, long hud) {}
@@ -155,8 +155,9 @@ public final class FrameClient {
       targetText.setColor(Color.WHITE); targetHalo.setColor(Color.BLACK); targetHalo.setStyle(Paint.Style.STROKE);
       lockDate.setColor(Color.argb(245, 246, 246, 246)); lockDate.setTextAlign(Paint.Align.CENTER);
       lockTime.setColor(Color.argb(250, 250, 250, 250)); lockTime.setTextAlign(Paint.Align.CENTER);
+      lockTemperature.setColor(Color.argb(235, 246, 246, 246)); lockTemperature.setTextAlign(Paint.Align.CENTER);
       Typeface lockTypeface = Typeface.create("sans-serif-light", Typeface.NORMAL);
-      lockDate.setTypeface(lockTypeface); lockTime.setTypeface(lockTypeface);
+      lockDate.setTypeface(lockTypeface); lockTime.setTypeface(lockTypeface); lockTemperature.setTypeface(lockTypeface);
       lockTime.setLetterSpacing(0.035f); }
     /** The module reports whether a touch panel is bound and whether the daemon has it open right now; calibration runs from the preview toolbar while a session is live. */
     private volatile boolean touchBound, touchPresent, calibrating;
@@ -919,23 +920,33 @@ public final class FrameClient {
         return phoneDisplayLocked();
     }
 
-    /** Dims the captured app with a top/bottom black gradient and leaves only the clock visible. */
+    /** Draws only the custom lock information over the current app frame; no native lock-screen/page layer is copied. */
     private void drawLockScreen(Canvas canvas, int width, int height) {
         LockScreenSettings lock = lockScreenSettings;
-        if (!savedSource.virtual() || !phoneDisplayLocked() || !lock.dimBackground()) return;
+        if (!savedSource.virtual() || !phoneDisplayLocked()) return;
         long now = System.currentTimeMillis();
+        long elapsed = SystemClock.elapsedRealtime();
         float scale = Math.max(0.75f, Math.min(width, height) / 320f);
-        lockTime.setTextSize(Math.max(64f, Math.min(width * 0.46f, height * 0.30f)));
-        lockShade.setShader(new LinearGradient(0f, 0f, 0f, height,
-                new int[]{Color.argb(248, 0, 0, 0), Color.argb(188, 0, 0, 0),
-                        Color.argb(78, 0, 0, 0), Color.argb(188, 0, 0, 0), Color.argb(248, 0, 0, 0)},
-                new float[]{0f, 0.22f, 0.50f, 0.78f, 1f}, Shader.TileMode.CLAMP));
-        canvas.drawRect(0, 0, width, height, lockShade);
-        lockShade.setShader(null);
+        float center = height * 0.50f;
         if (lock.showTime()) {
-            float center = height * 0.50f;
+            lockTime.setTextSize(Math.max(64f, Math.min(width * 0.46f, height * 0.30f)));
             canvas.drawText(lockTimeFormat.format(new Date(now)), width * 0.5f,
                     center - (lockTime.ascent() + lockTime.descent()) * 0.5f, lockTime);
+        }
+        float detailY = center + Math.max(42f, lockTime.getTextSize() * 0.42f);
+        if (lock.showDate()) {
+            lockDate.setTextSize(Math.max(18f, 24f * scale));
+            canvas.drawText(lockDateFormat.format(new Date(now)), width * 0.5f, detailY, lockDate);
+            detailY += lockDate.getTextSize() * 1.35f;
+        }
+        if (lock.showTemperature()) {
+            dev.ichinomiya.ninebotenhance.core.BmsState bms = hud.bmsIfFresh(elapsed);
+            int temperature = bms.data().temperature();
+            if (temperature != Integer.MIN_VALUE) {
+                String value = Integer.toString(temperature) + (lock.showTemperatureUnit() ? "℃" : "");
+                lockTemperature.setTextSize(Math.max(16f, 21f * scale));
+                canvas.drawText(value, width * 0.5f, detailY, lockTemperature);
+            }
         }
     }
 
@@ -962,8 +973,8 @@ public final class FrameClient {
                     if (picture == null || picture.isRecycled()) return false;
                     float[] r = debug ? new float[]{0, 0, width, height} : Geometry.fit(picture.getWidth(), picture.getHeight(), width, height);
                     canvas.drawBitmap(picture, null, new RectF(r[0], r[1], r[2], r[3]), paint);
-                    // Keep the captured app clean while the phone is locked; the lock layer supplies the clock.
-                    if(!debug&&savedSource.virtual()&&!phoneDisplayLocked()){int overlaySave=canvas.save();canvas.translate(r[0],r[1]);hud.draw(canvas,Math.round(r[2]-r[0]),Math.round(r[3]-r[1]),SystemClock.elapsedRealtime());drawTouchMarks(canvas,Math.round(r[2]-r[0]),SystemClock.elapsedRealtime());drawCalibrationTarget(canvas,Math.round(r[2]-r[0]),Math.round(r[3]-r[1]));canvas.restoreToCount(overlaySave);}
+                    // Keep the voltage and phone-status HUD on the virtual display; the lock layer only adds its selected details.
+                    if(!debug&&savedSource.virtual()){int overlaySave=canvas.save();canvas.translate(r[0],r[1]);long overlayNow=SystemClock.elapsedRealtime();hud.draw(canvas,Math.round(r[2]-r[0]),Math.round(r[3]-r[1]),overlayNow);if(!phoneDisplayLocked()){drawTouchMarks(canvas,Math.round(r[2]-r[0]),overlayNow);drawCalibrationTarget(canvas,Math.round(r[2]-r[0]),Math.round(r[3]-r[1]));}canvas.restoreToCount(overlaySave);}
                 }
                 if (includeLockOverlay) drawLockScreen(canvas, width, height);
             } finally { canvas.restoreToCount(saved); }
