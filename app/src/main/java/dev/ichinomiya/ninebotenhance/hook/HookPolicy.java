@@ -30,7 +30,10 @@ public final class HookPolicy {
     }
     public static boolean bitmapGetter(String className, String method, int parameterCount, boolean bitmapReturn) {
         // No skipping coroutine bodies, timers or methods with transport/lifecycle side effects.
-        return captureClass(className) && !className.contains("$") && method.equals("getBitmap") && parameterCount == 0 && bitmapReturn;
+        // ViewEncoder and LoopBitmapEncoder compile their bitmap supplier into nested Kotlin
+        // coroutine/state-machine classes. Those are the real per-frame entry points while
+        // the phone display is asleep, so they must not be excluded by the '$' check.
+        return captureClass(className) && method.equals("getBitmap") && parameterCount == 0 && bitmapReturn;
     }
     public static boolean terminalCastMethod(String className, String method) {
         return className.equals("cn.ninebot.mapcapture.DeviceScreenCastManager")

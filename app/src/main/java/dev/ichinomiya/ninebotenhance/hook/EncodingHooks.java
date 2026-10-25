@@ -235,7 +235,12 @@ public final class EncodingHooks {
                     if(!override.active()||log.active()==null)return result;
                     if(kind==1&&override.overridesBitrate())return Integer.valueOf(override.bitrateBps());
                     if(kind==2&&override.overridesFps())return Double.valueOf(override.fps());
-                    if(kind==3&&override.overridesFps())return Integer.valueOf(override.intervalMs());
+                    if(kind==3) {
+                        // The lock-screen app layer must keep producing frames even when the
+                        // phone display is asleep; otherwise Ninebot reuses one Bitmap forever.
+                        if (frames.lockScreenSettings().keepAppRefreshing() && frames.displayLockActive()) return Integer.valueOf(100);
+                        if (override.overridesFps()) return Integer.valueOf(override.intervalMs());
+                    }
                 } catch(RuntimeException ignored) {}
                 return result;
             }); frames.report("OVERRIDE hook "+type.getSimpleName()+"."+getter); }
