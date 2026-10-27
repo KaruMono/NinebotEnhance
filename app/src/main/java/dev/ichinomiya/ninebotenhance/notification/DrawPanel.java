@@ -45,11 +45,22 @@ public final class DrawPanel {
         canvas.drawText(String.valueOf(settings.maxSpeed()), l.centerX() + endX, endY, text);
         for (int i = 0; i < fields.length; i++) {
             float x = l.fieldCenter(i);
-            text.setColor(p.text()); text.setTextSize(l.fieldValueSize()); text.setFakeBoldText(true);
-            canvas.drawText(value(fields[i], v), x, l.fieldTop() + l.fieldValueSize() * 1.15f, text);
-            text.setFakeBoldText(false); text.setColor(p.label()); text.setTextSize(l.fieldLabelSize());
-            canvas.drawText(DrawSettings.fieldName(fields[i]), x, l.fieldTop() + l.fieldValueSize() * 1.15f + l.fieldLabelSize() * 1.5f, text);
+            String fieldValue = value(fields[i], v);
+            float valueSize = fitTextSize(fieldValue, l.fieldValueSize(), l.fieldWidth() * 0.90f, true);
+            text.setColor(p.text()); text.setTextSize(valueSize); text.setFakeBoldText(true);
+            float valueBaseline = l.fieldTop() + valueSize * 1.15f;
+            canvas.drawText(fieldValue, x, valueBaseline, text);
+            String fieldLabel = DrawSettings.fieldName(fields[i]);
+            float labelSize = fitTextSize(fieldLabel, l.fieldLabelSize(), l.fieldWidth() * 0.90f, false);
+            text.setFakeBoldText(false); text.setColor(p.label()); text.setTextSize(labelSize);
+            canvas.drawText(fieldLabel, x, valueBaseline + labelSize * 1.5f, text);
         }
+    }
+    private float fitTextSize(String value, float requested, float maxWidth, boolean bold) {
+        text.setFakeBoldText(bold);
+        text.setTextSize(requested);
+        float measured = text.measureText(value);
+        return measured > maxWidth && measured > 0 ? requested * maxWidth / measured : requested;
     }
     public static String value(int field, Values v) {
         switch (field) {
