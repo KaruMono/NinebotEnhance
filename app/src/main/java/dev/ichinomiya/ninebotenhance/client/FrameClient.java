@@ -75,7 +75,7 @@ public final class FrameClient {
     private final ArrayDeque<String> reports = new ArrayDeque<>();
     private final Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG);
     private final Paint overlayText = new Paint(Paint.ANTI_ALIAS_FLAG), overlayBack = new Paint();
-    private final Paint lockShade = new Paint(Paint.ANTI_ALIAS_FLAG), lockDate = new Paint(Paint.ANTI_ALIAS_FLAG), lockTime = new Paint(Paint.ANTI_ALIAS_FLAG), lockTemperature = new Paint(Paint.ANTI_ALIAS_FLAG), lockIcon = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint lockShade = new Paint(Paint.ANTI_ALIAS_FLAG), lockDate = new Paint(Paint.ANTI_ALIAS_FLAG), lockTime = new Paint(Paint.ANTI_ALIAS_FLAG), lockTemperature = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final java.text.SimpleDateFormat lockDateFormat = new java.text.SimpleDateFormat("M月d日  EEEE", java.util.Locale.CHINA);
     private final java.text.SimpleDateFormat lockTimeFormat = new java.text.SimpleDateFormat("HH:mm", java.util.Locale.ROOT);
     private record FrameStamp(int picture, long hud) {}
@@ -155,10 +155,9 @@ public final class FrameClient {
     private final Paint targetText = new Paint(Paint.ANTI_ALIAS_FLAG), targetHalo = new Paint(Paint.ANTI_ALIAS_FLAG);
     { markFill.setColor(Color.WHITE); markRing.setColor(Color.WHITE); markRing.setStyle(Paint.Style.STROKE); markOutline.setColor(Color.BLACK); markOutline.setStyle(Paint.Style.STROKE);
       targetText.setColor(Color.WHITE); targetHalo.setColor(Color.BLACK); targetHalo.setStyle(Paint.Style.STROKE);
-      lockDate.setColor(Color.argb(170, 246, 246, 246)); lockDate.setTextAlign(Paint.Align.CENTER);
-      lockTime.setColor(Color.argb(185, 250, 250, 250)); lockTime.setTextAlign(Paint.Align.CENTER);
-      lockTemperature.setColor(Color.argb(165, 246, 246, 246)); lockTemperature.setTextAlign(Paint.Align.CENTER);
-      lockIcon.setColor(Color.argb(175, 246, 246, 246)); lockIcon.setStyle(Paint.Style.STROKE); lockIcon.setStrokeCap(Paint.Cap.ROUND);
+      lockDate.setColor(Color.argb(245, 246, 246, 246)); lockDate.setTextAlign(Paint.Align.CENTER);
+      lockTime.setColor(Color.argb(250, 250, 250, 250)); lockTime.setTextAlign(Paint.Align.CENTER);
+      lockTemperature.setColor(Color.argb(235, 246, 246, 246)); lockTemperature.setTextAlign(Paint.Align.CENTER);
       Typeface lockTypeface = Typeface.create("sans-serif-light", Typeface.NORMAL);
       lockDate.setTypeface(lockTypeface); lockTime.setTypeface(lockTypeface); lockTemperature.setTypeface(lockTypeface);
       lockTime.setLetterSpacing(0.035f); }
@@ -626,7 +625,6 @@ public final class FrameClient {
             float[] r = Geometry.fit(settings.width, settings.height, width, height);
             canvas.translate(r[0], r[1]); float scale = (r[2] - r[0]) / settings.width; canvas.scale(scale, scale);
             drawPanel.draw(canvas, settings.width, settings.height, HudPalette.of(dashboardDark), settings.background(dashboardDark), drawSettings, drawValues(SystemClock.elapsedRealtime()));
-            drawDashboardTopInfo(canvas, settings.width, settings.height);
             canvas.restoreToCount(save);
             if (encoderOverride.previewStats()) drawStatistics(canvas, r[0], r[1]);
             return;
@@ -640,7 +638,6 @@ public final class FrameClient {
         if (!debugMode.enabled() && savedSource.virtual()) {
             int overlaySave = canvas.save(); canvas.translate(r[0], r[1]);
             hud.draw(canvas, Math.round(r[2]-r[0]), Math.round(r[3]-r[1]), SystemClock.elapsedRealtime());
-            drawDashboardTopInfo(canvas, Math.round(r[2]-r[0]), Math.round(r[3]-r[1]));
             drawTouchMarks(canvas, Math.round(r[2]-r[0]), SystemClock.elapsedRealtime());
             drawCalibrationTarget(canvas, Math.round(r[2]-r[0]), Math.round(r[3]-r[1]));
             // Without a cast the preview shows, on top of everything, what the vehicle dashboard itself paints over the frame.
@@ -944,37 +941,6 @@ public final class FrameClient {
         return phoneDisplayLocked();
     }
 
-    /** Draws the dashboard's time/date/lock replacement above the live virtual-screen picture. */
-    private void drawDashboardTopInfo(Canvas canvas, int width, int height) {
-        if (!savedSource.virtual() || width < 1 || height < 1) return;
-        int bandHeight = Math.min(height, Math.max(74, Math.round(height * 0.18f)));
-        lockShade.setStyle(Paint.Style.FILL);
-        // Opaque background removes the original centered time/date/lock pixels; the replacement glyphs remain translucent.
-        lockShade.setColor(Color.rgb(35, 45, 55));
-        canvas.drawRect(0, 0, width, bandHeight, lockShade);
-        LockScreenSettings lock = lockScreenSettings;
-        long now = System.currentTimeMillis();
-        float scale = Math.max(0.55f, Math.min(width, height) / 480f);
-        float detailY = 0;
-        if (lock.showTime()) {
-            lockTime.setTextSize(Math.max(22f, 42f * scale));
-            canvas.drawText(lockTimeFormat.format(new Date(now)), width * 0.5f,
-                    lockTime.getTextSize() * 0.92f, lockTime);
-            detailY = lockTime.getTextSize() * 1.32f;
-        }
-        if (lock.showDate()) {
-            lockDate.setTextSize(Math.max(10f, 15f * scale));
-            canvas.drawText(lockDateFormat.format(new Date(now)), width * 0.5f,
-                    detailY > 0 ? detailY : lockDate.getTextSize() * 1.20f, lockDate);
-            detailY += lockDate.getTextSize() * 1.15f;
-        }
-        float size = Math.max(12f, 18f * scale), cx = width * 0.5f, top = Math.max(detailY, lockTime.getTextSize() * 1.48f);
-        float bodyLeft = cx - size * 0.42f, bodyRight = cx + size * 0.42f, bodyTop = top + size * 0.34f, bodyBottom = top + size;
-        canvas.drawRoundRect(new RectF(bodyLeft, bodyTop, bodyRight, bodyBottom), size * 0.10f, size * 0.10f, lockIcon);
-        RectF shackle = new RectF(cx - size * 0.30f, top, cx + size * 0.30f, top + size * 0.62f);
-        canvas.drawArc(shackle, 180, 180, false, lockIcon);
-    }
-
     /** Draws only the custom lock information over the current app frame; no native lock-screen/page layer is copied. */
     private void drawLockScreen(Canvas canvas, int width, int height) {
         LockScreenSettings lock = lockScreenSettings;
@@ -983,8 +949,14 @@ public final class FrameClient {
         long elapsed = SystemClock.elapsedRealtime();
         float scale = Math.max(0.75f, Math.min(width, height) / 320f);
         float center = height * 0.50f;
+        lockTime.setTextSize(Math.max(64f, Math.min(width * 0.46f, height * 0.30f)));
+        lockShade.setShader(new LinearGradient(0f, 0f, 0f, height,
+                new int[]{Color.argb(248, 0, 0, 0), Color.argb(188, 0, 0, 0),
+                        Color.argb(78, 0, 0, 0), Color.argb(188, 0, 0, 0), Color.argb(248, 0, 0, 0)},
+                new float[]{0f, 0.22f, 0.50f, 0.78f, 1f}, Shader.TileMode.CLAMP));
+        canvas.drawRect(0, 0, width, height, lockShade);
+        lockShade.setShader(null);
         if (lock.showTime()) {
-            lockTime.setTextSize(Math.max(64f, Math.min(width * 0.46f, height * 0.30f)));
             canvas.drawText(lockTimeFormat.format(new Date(now)), width * 0.5f,
                     center - (lockTime.ascent() + lockTime.descent()) * 0.5f, lockTime);
         }
@@ -1022,7 +994,6 @@ public final class FrameClient {
             try { canvas.clipRect(0, 0, width, height); canvas.drawColor(Color.BLACK);
                 if (drawing && !debug) {
                     drawPanel.draw(canvas, width, height, HudPalette.of(dashboardDark), settings.background(dashboardDark), drawSettings, drawValues(SystemClock.elapsedRealtime()));
-                    drawDashboardTopInfo(canvas, width, height);
                 } else {
                     LockScreenSettings lock = lockScreenSettings;
                     Bitmap picture = debug ? calibrationFrame() : (phoneDisplayLocked() && (!lock.keepAppRefreshing() || latest == null) && lastUnlocked != null ? lastUnlocked : latest);
@@ -1030,9 +1001,9 @@ public final class FrameClient {
                     float[] r = debug ? new float[]{0, 0, width, height} : Geometry.fit(picture.getWidth(), picture.getHeight(), width, height);
                     canvas.drawBitmap(picture, null, new RectF(r[0], r[1], r[2], r[3]), paint);
                     // Keep the voltage and phone-status HUD on the virtual display; the lock layer only adds its selected details.
-                    if(!debug&&savedSource.virtual()){int overlaySave=canvas.save();canvas.translate(r[0],r[1]);long overlayNow=SystemClock.elapsedRealtime();hud.draw(canvas,Math.round(r[2]-r[0]),Math.round(r[3]-r[1]),overlayNow);drawDashboardTopInfo(canvas,Math.round(r[2]-r[0]),Math.round(r[3]-r[1]));if(!phoneDisplayLocked()){drawTouchMarks(canvas,Math.round(r[2]-r[0]),overlayNow);drawCalibrationTarget(canvas,Math.round(r[2]-r[0]),Math.round(r[3]-r[1]));}canvas.restoreToCount(overlaySave);}
+                    if(!debug&&savedSource.virtual()){int overlaySave=canvas.save();canvas.translate(r[0],r[1]);long overlayNow=SystemClock.elapsedRealtime();hud.draw(canvas,Math.round(r[2]-r[0]),Math.round(r[3]-r[1]),overlayNow);if(!phoneDisplayLocked()){drawTouchMarks(canvas,Math.round(r[2]-r[0]),overlayNow);drawCalibrationTarget(canvas,Math.round(r[2]-r[0]),Math.round(r[3]-r[1]));}canvas.restoreToCount(overlaySave);}
                 }
-                // Dashboard top information is rendered in the virtual-screen overlay above; do not add the old centered lock layer.
+                if (includeLockOverlay) drawLockScreen(canvas, width, height);
             } finally { canvas.restoreToCount(saved); }
             replacements++; if (streamStats != null) streamStats.replaced(); return true;
         }
@@ -1061,6 +1032,11 @@ public final class FrameClient {
             overlay = overlay * 31L + (System.currentTimeMillis() / 60000L);
             if (phoneDisplayLocked()) {
                 LockScreenSettings lock = lockScreenSettings;
+                overlay = overlay * 31L + Boolean.hashCode(lock.showTime());
+                overlay = overlay * 31L + Boolean.hashCode(lock.showDate());
+                overlay = overlay * 31L + Boolean.hashCode(lock.showTemperature());
+                overlay = overlay * 31L + Boolean.hashCode(lock.showTemperatureUnit());
+                overlay = overlay * 31L + Boolean.hashCode(lock.keepAppRefreshing());
                 overlay = overlay * 31L + (lock.keepAppRefreshing() ? (SystemClock.elapsedRealtime() / 100L) : 0L);
             }
         }
