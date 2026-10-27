@@ -114,6 +114,8 @@ public final class FrameClient {
     private final String process;
     private Context context;
     private volatile String beginAccepted;
+    /** Recreate a lost module-side session once after a Binder/service restart. */
+    private boolean recoveringSession;
     private volatile String moduleDigest = "尚未取得模块进程日志", brokerIdentity = "尚未取得模块进程标识";
     private volatile DisplaySettings savedSettings = DisplaySettings.defaults();
     private volatile String savedApp = "";
@@ -770,9 +772,23 @@ public final class FrameClient {
             String denied = status.getString("input_denied", "");
             if (!denied.isEmpty() && !denied.equals(inputDeniedNotified)) { inputDeniedNotified = denied; report("INPUT denied: " + denied); main.post(() -> inputDeniedListener.accept(denied)); }
         } else {
-            active = displayReady = false; state = "模块服务已重启或会话已失效，请重新开始投屏";
+            boolean wasActive = active;
+            active = displayReady = false; state = "模块服务已重启，正在恢复虚拟屏";
             appRecovery = AppRecoveryState.HIDDEN; appRecoveryDetail = ""; touchBound = touchPresent = false;
             report("BRIDGE requested session absent after reconnect");
+            // A module process restart destroys only the remote session. Recreate it
+            // from the cached configuration instead of forcing the user to reinstall
+            // or manually stop/start the display.
+            if (wasActive && savedSource.virtual() && !recoveringSession) {
+                recoveringSession = true;
+                beginAccepted = null;
+                report("BRIDGE recovering virtual display session");
+                startDirect(request, null, error -> {
+                    recoveringSession = false;
+                    if (error != null) report("BRIDGE virtual display recovery failed: " + error);
+                    else report("BRIDGE virtual display recovery complete");
+                });
+            }
         }
         lastPoll = SystemClock.elapsedRealtime();
         if (active && displayReady && screenCapture && reader != null) resizeRecording(request, status);

@@ -8,7 +8,8 @@ public final class NotificationTimeline<T> {
     public static final int MIN_LIMIT=1,MAX_LIMIT=5,DEFAULT_LIMIT=3;
     public static int clampLimit(int limit){return Math.max(MIN_LIMIT,Math.min(MAX_LIMIT,limit));}
     public static final int MIN_SECONDS = 5, MAX_SECONDS = 30, DEFAULT_SECONDS = 15;
-    public static final int MIN_WIDTH=180,MAX_WIDTH=600,DEFAULT_WIDTH=312;
+    // Keep the receipt strip compact on the 848px dashboard; users can still widen it in settings.
+    public static final int MIN_WIDTH=180,MAX_WIDTH=600,DEFAULT_WIDTH=280;
     public static int requireWidth(int width){if(width<MIN_WIDTH||width>MAX_WIDTH)throw new IllegalArgumentException("通知宽度须为 180–600");return width;}
     public static int clampSeconds(int seconds) { return Math.max(MIN_SECONDS, Math.min(MAX_SECONDS, seconds)); }
     public static int duration(int seconds) {

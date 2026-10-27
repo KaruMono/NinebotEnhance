@@ -33,8 +33,10 @@ public final class BmsController {
     public static final long HOLD_MS=30000,SCREEN_HOLD_MS=30000,SCREEN_RENEW_MS=10000;
     /** Who holds the link; the same three sources as the lamp. */
     public static final int HOLD_SESSION=0,HOLD_FOREGROUND=1,HOLD_SCREEN=2;
-    private static final long HANDSHAKE_TIMEOUT_MS=8000,RETRY_MS=5000,TICK_MS=1000;
-    private static final long WRITE_TIMEOUT_MS=2500,CHUNK_GAP_MS=30,BACKOFF_MAX_MS=60000;
+    // Keep recovery quick after a transient Android BLE callback loss, while still
+    // bounding retries so a powered-off board does not spin the radio forever.
+    private static final long HANDSHAKE_TIMEOUT_MS=8000,RETRY_MS=1500,TICK_MS=1000;
+    private static final long WRITE_TIMEOUT_MS=2500,CHUNK_GAP_MS=30,BACKOFF_MAX_MS=12000;
     private static final int DEFAULT_MTU=23,REQUEST_MTU=247;
     private static BmsController instance;
     public static synchronized BmsController get(Context context){
@@ -267,7 +269,11 @@ public final class BmsController {
         }else if(missedPolls!=0){
             missedPolls=0;log("notification stream resumed");
         }
-        if(missedPolls>=3){close("读取无应答");retryAt=0;return;}
+        if(missedPolls>=3){
+            // A dead notification stream is not recoverable by more writes on the
+            // same GATT object. Close it and let the fast retry path create a clean link.
+            close("读取无应答");retryAt=SystemClock.elapsedRealtime()+RETRY_MS;return;
+        }
         if(protocol==null)send(DlBmsProtocol.FC_DATA,new byte[0]);
         else{
             log("poll "+BmsSettings.protocolName(board));
