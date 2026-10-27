@@ -209,7 +209,7 @@ public final class MirrorModule extends XposedModule {
             }
         } finally { examining.set(false); }
         updateSummary();
-        if (++scanCount < 15) new Handler(Looper.getMainLooper()).postDelayed(this::scan, 2000);
+        if (++scanCount < 60) new Handler(Looper.getMainLooper()).postDelayed(this::scan, 2000);
     }
     private void inspect(Class<?> type) {
         examining.set(true);
@@ -218,7 +218,11 @@ public final class MirrorModule extends XposedModule {
         finally { examining.set(false); }
     }
     private void inspectUnchecked(Class<?> type) {
-        if (!HookPolicy.interestingClass(type.getName()) || seen.size() >= 220 || !seen.add(type)) return;
+        if (!HookPolicy.interestingClass(type.getName())) return;
+        boolean firstSeen = seen.add(type);
+        if (seen.size() > 2000) return;
+        // A class can be discovered before its dependent methods are ready in a lazily loaded Ninebot dex.
+        // Revisit it on bounded rescans; every concrete hook installer remains idempotent via its own set.
         if (TirePressureHooks.interesting(type.getName())) { tirePressure.inspect(type); updateSummary(); return; }
         if (VehicleHooks.interesting(type.getName())) { vehicle.inspect(type); updateSummary(); return; }
         if (FeatureHooks.interesting(type.getName())) { feature.inspect(type); updateSummary(); return; }
