@@ -376,6 +376,11 @@ public final class FrameClient {
         report("LOCKSCREEN settings saved time="+value.showTime()+" refresh="+value.keepAppRefreshing()+" dim="+value.dimBackground());
         View preview=inlinePreview.get(); if(preview != null) preview.postInvalidateOnAnimation();
     }
+    /** A virtual display owns the vehicle frame; capture/draw modes must never receive the lock overlay. */
+    public String lockScreenModeSummary() {
+        if (!savedSource.virtual()) return "当前方式：" + savedSource.label() + "。锁屏覆盖层不会启用，可保留并手动修改设置。";
+        return virtualDisplayAvailable() ? "当前方式：虚拟屏，锁屏覆盖层已自动启用。" : "当前方式：虚拟屏，但虚拟屏尚未运行；连接并运行后自动启用。";
+    }
     public void saveHiddenFeatures(HiddenFeatures value){
         hiddenFeatures=value;
         if(context!=null)context.getSharedPreferences(Protocol.MODULE+".widgets",Context.MODE_PRIVATE).edit().putBoolean("unhide_throttle",value.throttle()).putBoolean("unhide_hardkey",value.hardkey()).putBoolean("unhide_cruise",value.cruise()).apply();
@@ -948,23 +953,29 @@ public final class FrameClient {
         long now = System.currentTimeMillis();
         long elapsed = SystemClock.elapsedRealtime();
         float scale = Math.max(0.75f, Math.min(width, height) / 320f);
-        float center = height * 0.50f;
-        lockTime.setTextSize(Math.max(64f, Math.min(width * 0.46f, height * 0.30f)));
         lockShade.setShader(new LinearGradient(0f, 0f, 0f, height,
                 new int[]{Color.argb(248, 0, 0, 0), Color.argb(188, 0, 0, 0),
                         Color.argb(78, 0, 0, 0), Color.argb(188, 0, 0, 0), Color.argb(248, 0, 0, 0)},
                 new float[]{0f, 0.22f, 0.50f, 0.78f, 1f}, Shader.TileMode.CLAMP));
         canvas.drawRect(0, 0, width, height, lockShade);
         lockShade.setShader(null);
+
+        // The captured app already contains its own large clock. Paint over that old
+        // center layer before drawing the single, aligned lock group at the top.
+        lockShade.setColor(Color.rgb(35, 45, 55));
+        canvas.drawRect(width * 0.16f, height * 0.30f, width * 0.84f, height * 0.63f, lockShade);
+        float timeSize = Math.max(44f, Math.min(width * 0.19f, height * 0.17f));
+        lockTime.setTextSize(timeSize);
+        float top = height * 0.08f;
+        float timeBaseline = top - (lockTime.ascent() + lockTime.descent()) * 0.5f;
         if (lock.showTime()) {
-            canvas.drawText(lockTimeFormat.format(new Date(now)), width * 0.5f,
-                    center - (lockTime.ascent() + lockTime.descent()) * 0.5f, lockTime);
+            canvas.drawText(lockTimeFormat.format(new Date(now)), width * 0.5f, timeBaseline, lockTime);
         }
-        float detailY = center + Math.max(42f, lockTime.getTextSize() * 0.42f);
+        float detailY = timeBaseline + Math.max(28f, timeSize * 0.78f);
         if (lock.showDate()) {
-            lockDate.setTextSize(Math.max(18f, 24f * scale));
+            lockDate.setTextSize(Math.max(22f, Math.min(width * 0.085f, timeSize * 0.42f)));
             canvas.drawText(lockDateFormat.format(new Date(now)), width * 0.5f, detailY, lockDate);
-            detailY += lockDate.getTextSize() * 1.35f;
+            detailY += lockDate.getTextSize() * 1.45f;
         }
         if (lock.showTemperature()) {
             dev.ichinomiya.ninebotenhance.core.BmsState bms = hud.bmsIfFresh(elapsed);

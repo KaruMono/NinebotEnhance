@@ -43,14 +43,16 @@ public final class HiddenFeatureDialog {
         summary.setTextSize(14);
         summary.setPadding(0, 0, 0, MirrorUi.dp(activity, 12));
         content.addView(summary, new LinearLayout.LayoutParams(-1, -2));
+        TextView mode = new TextView(activity);
+        mode.setText(frames.lockScreenModeSummary());
+        mode.setTextColor(theme.secondary);
+        mode.setTextSize(14);
+        mode.setPadding(0, 0, 0, MirrorUi.dp(activity, 12));
+        content.addView(mode, new LinearLayout.LayoutParams(-1, -2));
         Button options = pageButton(activity, theme, "锁屏显示选项");
         content.addView(options, rowParams(activity));
         AlertDialog dialog = dialog(activity, theme, "锁屏设置", content);
         options.setOnClickListener(v -> {
-            if (!frames.virtualDisplayAvailable()) {
-                Toast.makeText(activity, "锁屏设置仅在虚拟屏已连接并正常运行时可用；当前虚拟屏已断开或当前不是虚拟屏，无法启用。", Toast.LENGTH_LONG).show();
-                return;
-            }
             dialog.dismiss();
             showLockOptions(activity, frames, reference);
         });
@@ -76,12 +78,13 @@ public final class HiddenFeatureDialog {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(theme.accent);
             dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(theme.accent);
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
-                if (!frames.virtualDisplayAvailable()) {
-                    Toast.makeText(activity, "虚拟屏已断开或当前不是虚拟屏，锁屏设置未启用。请先重新连接并保持虚拟屏运行。", Toast.LENGTH_LONG).show();
-                    return;
-                }
                 frames.saveLockScreenSettings(new LockScreenSettings(time.isChecked(), refresh.isChecked(), true,
                         date.isChecked(), temperature.isChecked(), temperatureUnit.isChecked()));
+                if (!frames.cachedSource().virtual()) {
+                    Toast.makeText(activity, "当前是绘制或投屏模式，锁屏覆盖层不会启用；设置已保留。", Toast.LENGTH_LONG).show();
+                } else if (!frames.virtualDisplayAvailable()) {
+                    Toast.makeText(activity, "虚拟屏尚未运行，连接并运行后锁屏覆盖层会自动启用。", Toast.LENGTH_LONG).show();
+                }
                 dialog.dismiss();
             });
         });
