@@ -15,7 +15,7 @@ public record DrawLayout(float left, float top, float right, float bottom, float
         float centerX = width / 2f, centerY = top + gauge * 0.55f;
         float strip = bottom - (top + gauge);
         return new DrawLayout(0, top, width, bottom, centerX, centerY, radius, stroke, radius * 1.2f, radius * 0.38f, radius * 0.32f,
-                top + gauge, fields > 0 ? width / (float) fields : width, strip * 0.8f, strip * 0.4f);
+                top + gauge, fields > 0 ? width / (float) fields : width, strip * 0.28f, strip * 0.14f);
     }
     /** Degrees of arc for a value on a gauge of the given full scale; clamped to the arc. */
     public static float sweepFor(float value, float max) {
