@@ -968,13 +968,20 @@ public final class FrameClient {
         lockTime.setTextSize(timeSize);
         float top = height * 0.08f;
         float timeBaseline = top - (lockTime.ascent() + lockTime.descent()) * 0.5f;
+        // The right instrument panel is part of the frame but not part of the
+        // refreshed app area. Center the lock group in the usable area instead
+        // of at the geometric center of the whole frame.
+        dev.ichinomiya.ninebotenhance.core.DashboardProfile profile = dev.ichinomiya.ninebotenhance.core.DashboardProfile.of(width, height);
+        float instrumentLeft = profile.dx() + profile.scale() * dev.ichinomiya.ninebotenhance.core.SidebarLayout.INSTRUMENT.left();
+        float centerX = Math.max(0f, Math.min(width, instrumentLeft)) * 0.5f;
+        if (instrumentLeft <= 0f || instrumentLeft >= width) centerX = width * 0.5f;
         if (lock.showTime()) {
-            canvas.drawText(lockTimeFormat.format(new Date(now)), width * 0.5f, timeBaseline, lockTime);
+            canvas.drawText(lockTimeFormat.format(new Date(now)), centerX, timeBaseline, lockTime);
         }
         float detailY = timeBaseline + Math.max(28f, timeSize * 0.78f);
         if (lock.showDate()) {
             lockDate.setTextSize(Math.max(22f, Math.min(width * 0.085f, timeSize * 0.42f)));
-            canvas.drawText(lockDateFormat.format(new Date(now)), width * 0.5f, detailY, lockDate);
+            canvas.drawText(lockDateFormat.format(new Date(now)), centerX, detailY, lockDate);
             detailY += lockDate.getTextSize() * 1.45f;
         }
         if (lock.showTemperature()) {
@@ -983,7 +990,7 @@ public final class FrameClient {
             if (temperature != Integer.MIN_VALUE) {
                 String value = Integer.toString(temperature) + (lock.showTemperatureUnit() ? "℃" : "");
                 lockTemperature.setTextSize(Math.max(16f, 21f * scale));
-                canvas.drawText(value, width * 0.5f, detailY, lockTemperature);
+                canvas.drawText(value, centerX, detailY, lockTemperature);
             }
         }
     }
