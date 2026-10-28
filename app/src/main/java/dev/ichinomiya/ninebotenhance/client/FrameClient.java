@@ -806,10 +806,10 @@ public final class FrameClient {
                 WidgetSettings current = widgets;
                 hud.acceptProbe(current.enabled(WidgetSettings.REGISTER_PROBE) ? probe.snapshot(probeSelection, probeRawModules) : null);
                 hud.acceptRide(ride.snapshot());
-                // Local simulation reads too when the vehicle happens to be connected, so reads can be checked without casting.
-                // The drawn picture reads what its gauge and fields show; the passed-through capture reads nothing.
+                // Vehicle telemetry is independent of the picture provider. Capture, virtual-display,
+                // and drawn sessions all need the same live values for the HUD and custom gauge.
                 WidgetSettings reads = drawing ? drawReads(current) : current;
-                if (!screenCapture && (reads.readsTyres() || reads.readsVoltage() || reads.readsSpeed() || reads.readsPower() || reads.enabled(WidgetSettings.REGISTER_PROBE))) vehiclePulse.accept(battery.selectedKey(), reads);
+                if (reads.readsTyres() || reads.readsVoltage() || reads.readsSpeed() || reads.readsPower() || reads.enabled(WidgetSettings.REGISTER_PROBE)) vehiclePulse.accept(battery.selectedKey(), reads);
                 else vehicleStop.run();
                 if (casting) themeSender.accept(battery.selectedKey(), dashboardDark);
                 if (casting && naviTest) naviTestPulse.accept(battery.selectedKey());
@@ -949,16 +949,18 @@ public final class FrameClient {
     /** Draws only the custom lock information over the current app frame; no native lock-screen/page layer is copied. */
     private void drawLockScreen(Canvas canvas, int width, int height) {
         LockScreenSettings lock = lockScreenSettings;
-        if (!savedSource.virtual() || !phoneDisplayLocked()) return;
+        if (!phoneDisplayLocked() || (!savedSource.virtual() && !drawing)) return;
         long now = System.currentTimeMillis();
         long elapsed = SystemClock.elapsedRealtime();
         float scale = Math.max(0.75f, Math.min(width, height) / 320f);
-        lockShade.setShader(new LinearGradient(0f, 0f, 0f, height,
-                new int[]{Color.argb(248, 0, 0, 0), Color.argb(188, 0, 0, 0),
-                        Color.argb(78, 0, 0, 0), Color.argb(188, 0, 0, 0), Color.argb(248, 0, 0, 0)},
-                new float[]{0f, 0.22f, 0.50f, 0.78f, 1f}, Shader.TileMode.CLAMP));
-        canvas.drawRect(0, 0, width, height, lockShade);
-        lockShade.setShader(null);
+        if (lock.dimBackground()) {
+            lockShade.setShader(new LinearGradient(0f, 0f, 0f, height,
+                    new int[]{Color.argb(248, 0, 0, 0), Color.argb(188, 0, 0, 0),
+                            Color.argb(78, 0, 0, 0), Color.argb(188, 0, 0, 0), Color.argb(248, 0, 0, 0)},
+                    new float[]{0f, 0.22f, 0.50f, 0.78f, 1f}, Shader.TileMode.CLAMP));
+            canvas.drawRect(0, 0, width, height, lockShade);
+            lockShade.setShader(null);
+        }
 
         // The captured app already contains its own large clock. Paint over that old
         // center layer before drawing the single, aligned lock group at the top.
