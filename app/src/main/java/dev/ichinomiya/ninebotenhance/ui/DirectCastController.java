@@ -773,7 +773,7 @@ public final class DirectCastController implements Application.ActivityLifecycle
     private static boolean autostartPrompted;
     /** Once per process: the system refused to bind the module service; say what usually causes that on this phone. */
     private void autostartPrompt(Activity activity) {
-        if (autostartPrompted || frames.embedded() || frames.serviceConnected() || !frames.serviceBindRefused() || !usable(activity)) return;
+        if (autostartPrompted || frames.serviceConnected() || !frames.serviceBindRefused() || !usable(activity)) return;
         autostartPrompted = true;
         AlertDialog.Builder builder = new AlertDialog.Builder(activity).setTitle("模块服务未连接").setMessage(frames.serviceAdvice()).setNegativeButton("关闭", null);
         if (ServiceBridge.hyperOs()) builder.setPositiveButton("打开设置", (d, w) -> openAutostart(activity));
@@ -783,7 +783,7 @@ public final class DirectCastController implements Application.ActivityLifecycle
     /** The module APK's exported launcher activity, started from the host by component; forceQueryable keeps it visible. */
     private void openModule(Activity activity) {
         try {
-            activity.startActivity(new Intent().setClassName(activity.getPackageName(), ModuleActivity.class.getName()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            activity.startActivity(new Intent().setClassName(Protocol.MODULE, ModuleActivity.class.getName()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             frames.report("SETTINGS module entry opened");
         } catch (RuntimeException e) { error(activity, "无法打开 Ninebot Enhance", Ipc.error(e)); frames.report("SETTINGS module entry failed " + e.getClass().getSimpleName()); }
     }

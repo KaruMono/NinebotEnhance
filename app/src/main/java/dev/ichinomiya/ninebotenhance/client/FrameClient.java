@@ -645,7 +645,7 @@ public final class FrameClient {
             hud.draw(canvas, Math.round(r[2]-r[0]), Math.round(r[3]-r[1]), SystemClock.elapsedRealtime());
             drawTouchMarks(canvas, Math.round(r[2]-r[0]), SystemClock.elapsedRealtime());
             drawCalibrationTarget(canvas, Math.round(r[2]-r[0]), Math.round(r[3]-r[1]));
-            // The preview mirrors the dashboard's own occlusion layer; keep this path intact for direct casting.
+            // Without a cast the preview shows, on top of everything, what the vehicle dashboard itself paints over the frame.
             if (!casting && !dev.ichinomiya.ninebotenhance.core.SidebarLayout.halfScreen(Math.round(r[2]-r[0]), Math.round(r[3]-r[1]))) dev.ichinomiya.ninebotenhance.notification.DashboardOcclusion.draw(canvas, Math.round(r[2]-r[0]), Math.round(r[3]-r[1]), hud.hillHold(SystemClock.elapsedRealtime()), hud.occlusions());
             canvas.restoreToCount(overlaySave);
         }
@@ -880,7 +880,6 @@ public final class FrameClient {
     public void summary(String value) { summary = value; }
     public String status() { return bridge.status() + "\n" + state + "\n" + summary; }
     public boolean serviceConnected() { return bridge.connected(); }
-    public boolean embedded() { return bridge.embedded(); }
     /** Lock-screen presentation is meaningful only while the configured virtual display is actually alive. */
     public boolean virtualDisplayAvailable() {
         return savedSource.virtual() && active && displayReady && beginAccepted != null

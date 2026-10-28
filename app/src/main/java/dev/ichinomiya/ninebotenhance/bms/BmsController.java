@@ -17,7 +17,6 @@ import dev.ichinomiya.ninebotenhance.ipc.Protocol;
 import java.security.SecureRandom;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 /**
@@ -144,10 +143,9 @@ public final class BmsController {
         publish(state.withPhase(BmsState.CONNECTING,""));
         try{gatt=device.connectGatt(context,false,callback,BluetoothDevice.TRANSPORT_LE);}
         catch(RuntimeException e){gatt=null;publish(BmsState.of(BmsState.FAILED,error(e)));}
-        retryAt=SystemClock.elapsedRealtime()+backoff(failures);
-        log("open "+current.mac()+" nextRetry="+retryAt);
+        retryAt=SystemClock.elapsedRealtime()+RETRY_MS;
+        log("open "+current.mac());
     }
-    private long backoff(int count){return Math.min(BACKOFF_MAX_MS,RETRY_MS*(1L<<Math.min(4,Math.max(0,count))));}
     private final Runnable handshakeTimeout=new Runnable(){@Override public void run(){
         if(gatt==null||ready)return;
         failures++;close("握手无应答");
@@ -274,7 +272,7 @@ public final class BmsController {
         if(missedPolls>=3){
             // A dead notification stream is not recoverable by more writes on the
             // same GATT object. Close it and let the fast retry path create a clean link.
-            close("读取无应答");retryAt=SystemClock.elapsedRealtime()+backoff(failures);return;
+            close("读取无应答");retryAt=SystemClock.elapsedRealtime()+RETRY_MS;return;
         }
         if(protocol==null)send(DlBmsProtocol.FC_DATA,new byte[0]);
         else{
@@ -415,11 +413,10 @@ public final class BmsController {
         if(scanner==null){main.post(()->done.accept(new Scan(List.of(),SCAN_UNAVAILABLE)));return;}
         BluetoothLeScanner active=scanner;
         LinkedHashMap<String,Found> found=new LinkedHashMap<>();int[] failure={0};
-        AtomicBoolean finished=new AtomicBoolean();Runnable[] finishRef=new Runnable[1];
         ScanCallback callback=new ScanCallback(){
             @Override public void onScanResult(int type,ScanResult result){keep(result);}
             @Override public void onBatchScanResults(List<ScanResult> results){for(ScanResult result:results)keep(result);}
-            @Override public void onScanFailed(int code){synchronized(found){failure[0]=code;}Runnable finish=finishRef[0];if(finish != null) main.post(finish);}
+            @Override public void onScanFailed(int code){synchronized(found){failure[0]=code;}}
             private void keep(ScanResult result){
                 String name=null;ScanRecord advertised=result.getScanRecord();
                 try{name=result.getDevice().getName();}catch(RuntimeException ignored){}
@@ -439,8 +436,9 @@ public final class BmsController {
         };
         ScanSettings scanSettings=new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
                 .setMatchMode(ScanSettings.MATCH_MODE_AGGRESSIVE).setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES).build();
-        Runnable finish=()->{
-            if(!finished.compareAndSet(false,true))return;
+        try{active.startScan(null,scanSettings,callback);}
+        catch(RuntimeException e){main.post(()->done.accept(new Scan(List.of(),SCAN_UNAVAILABLE)));return;}
+        main.postDelayed(()->{
             try{active.stopScan(callback);}catch(RuntimeException ignored){}
             List<Found> out;int code;
             synchronized(found){
@@ -449,10 +447,6 @@ public final class BmsController {
                 out=List.copyOf(sorted);code=failure[0];
             }
             done.accept(new Scan(out,code));
-        };
-        finishRef[0]=finish;
-        try{active.startScan(null,scanSettings,callback);}
-        catch(RuntimeException e){failure[0]=SCAN_UNAVAILABLE;main.post(finish);return;}
-        main.postDelayed(finish,Math.max(1000,millis));
+        },Math.max(1000,millis));
     }
 }

@@ -162,10 +162,9 @@ public final class LampController {
         publish(state.withPhase(LampState.CONNECTING,""));
         try{gatt=device.connectGatt(context,false,callback,BluetoothDevice.TRANSPORT_LE);}
         catch(RuntimeException e){gatt=null;publish(LampState.of(LampState.FAILED,error(e)));}
-        retryAt=SystemClock.elapsedRealtime()+backoff(authFailures);
-        log("open "+current.mac()+" nextRetry="+retryAt);
+        retryAt=SystemClock.elapsedRealtime()+RETRY_MS;
+        log("open "+current.mac());
     }
-    private long backoff(int count){return Math.min(AUTH_BACKOFF_MAX_MS,RETRY_MS*(1L<<Math.min(4,Math.max(0,count))));}
     /**
      * A wrong password looks like silence: this device answers an accepted handshake and ignores a rejected one entirely, so a
      * handshake with no answer is reported as such and retried ever more slowly instead of hammering the device forever.
@@ -173,7 +172,7 @@ public final class LampController {
     private final Runnable authTimeout=new Runnable(){@Override public void run(){
         if(gatt==null||authenticated)return;
         authFailures++;close(settings.kind()==LampKind.TX?"密码无应答":"握手无应答");
-        retryAt=SystemClock.elapsedRealtime()+backoff(authFailures);
+        retryAt=SystemClock.elapsedRealtime()+Math.min(AUTH_BACKOFF_MAX_MS,RETRY_MS*authFailures);
     }};
     /** Tear the GATT down without saying anything about it; the callers decide what state that leaves. */
     private void drop(){
