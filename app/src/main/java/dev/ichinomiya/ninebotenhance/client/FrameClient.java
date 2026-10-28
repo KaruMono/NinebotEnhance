@@ -962,10 +962,8 @@ public final class FrameClient {
             lockShade.setShader(null);
         }
 
-        // The captured app already contains its own large clock. Paint over that old
-        // center layer before drawing the single, aligned lock group at the top.
-        lockShade.setColor(Color.rgb(35, 45, 55));
-        canvas.drawRect(width * 0.16f, height * 0.30f, width * 0.84f, height * 0.63f, lockShade);
+        // Keep the captured app visible underneath the lock information. Do not paint
+        // a fixed center rectangle here: it obscures the refreshed application frame.
         float timeSize = Math.max(44f, Math.min(width * 0.19f, height * 0.17f));
         lockTime.setTextSize(timeSize);
         float top = height * 0.08f;
