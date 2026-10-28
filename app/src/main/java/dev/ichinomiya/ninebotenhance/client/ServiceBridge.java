@@ -16,6 +16,7 @@ public final class ServiceBridge {
     private final BindingState binding = new BindingState();
     private final Consumer<String> log;
     private Context context;
+    private boolean embedded;
     private Link current;
     private volatile IBinder remote;
     private volatile String state = "等待连接模块服务";
@@ -71,6 +72,7 @@ public final class ServiceBridge {
     }
     /** Why a bind may be refused, most likely cause first: the module hidden from Ninebot, then the ROM's autostart gate. */
     public String advice() {
+        if (embedded) return "内置模块服务正在宿主进程中运行，无需单独安装或开启 Ninebot Enhance。";
         boolean visible = moduleVisible();
         StringBuilder text = new StringBuilder();
         if (!visible) text.append(HIDDEN_DETECTED);
@@ -80,8 +82,17 @@ public final class ServiceBridge {
     }
     private String refused(String base) { return base + "\n" + advice(); }
     public void attach(Context context) {
-        main.post(() -> { if (this.context != null) return; this.context = context; rotate(); main.postDelayed(health, 1000); });
+        main.post(() -> {
+            if (this.context != null) return;
+            this.context = context;
+            // npatch/integrated builds run the module service under the host package.
+            // Standalone module builds keep the original cross-package target.
+            embedded = Protocol.TARGET.equals(context.getPackageName());
+            rotate();
+            main.postDelayed(health, 1000);
+        });
     }
+    public boolean embedded() { return embedded; }
     public String status() { return state; }
     public boolean connected() { IBinder value = remote; return value != null && value.isBinderAlive(); }
     public void ensure() { main.post(() -> { if (context != null && !connected() && (current == null || binding.expired(SystemClock.elapsedRealtime()))) rotate(); }); }
@@ -113,7 +124,8 @@ public final class ServiceBridge {
         if (failures >= 2) bindRefused = true;
         try {
             // Acquire a replacement binding before releasing the old one to avoid a needless Service.onDestroy.
-            ComponentName target = new ComponentName(Protocol.MODULE, SERVICE_CLASS);
+            String packageName = embedded ? Protocol.TARGET : Protocol.MODULE;
+            ComponentName target = new ComponentName(packageName, SERVICE_CLASS);
             log.accept("BRIDGE target=" + target.flattenToShortString());
             next.registered = context.bindService(new Intent().setComponent(target),
                     next, Context.BIND_AUTO_CREATE | Context.BIND_IMPORTANT);

@@ -55,8 +55,8 @@ public final class DashboardOcclusion {
         paint.setColor(0xffe2e6e9);c.drawRoundRect(r.left+52,r.top+164,r.left+55,r.top+175,1,1,paint);
         paint.setColor(0xff8a7cf0);c.drawRoundRect(r.left+16,r.top+179,r.left+92,r.top+183,2,2,paint);
         font(11,true);centered(c,"NOS",r.left+54,r.top+199,0xffd7dce0);
-        paint.setColor(0xff2ec95c);c.drawRoundRect(r.left+118,r.top+168,r.left+182,r.top+194,5,5,paint);c.drawRect(r.left+182,r.top+176,r.left+185,r.top+186,paint);
-        font(17,true);centered(c,"86%",r.left+150,r.top+187,0xff0d1c12);
+        // Do not paint the dashboard's green battery block over the navigation preview.
+        font(17,true);centered(c,"86%",r.left+150,r.top+187,0xfff2f4f5);
     }
     private static void font(float size,boolean bold){text.setTextSize(size);text.setTypeface(Typeface.create("sans-serif",bold?Typeface.BOLD:Typeface.NORMAL));}
     private static void centered(Canvas c,String s,float centerX,float baseline,int color){text.setColor(color);text.setTextAlign(Paint.Align.CENTER);c.drawText(s,centerX,baseline,text);text.setTextAlign(Paint.Align.LEFT);}
