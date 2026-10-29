@@ -21,7 +21,8 @@ public final class CastService extends Service {
     @Override public int onStartCommand(Intent in, int flags, int id) {
         if (running) { LogStore.add("CAST 已在运行，忽略重复启动"); return START_NOT_STICKY; }
         try {
-            int w=num(in,"width",1280), h=num(in,"height",720), fps=num(in,"fps",20), rate=num(in,"bitrate",2500000);
+            int[] size=fitSize(num(in,"width",1280), num(in,"height",720));
+            int w=size[0], h=size[1], fps=num(in,"fps",20), rate=num(in,"bitrate",2500000);
             String host=in.getStringExtra("host"); int port=num(in,"port",5004);
             if (host == null || host.trim().isEmpty()) throw new IllegalArgumentException("未填写 UDP 目标地址");
             LogStore.add("CAST 初始化 size="+w+"x"+h+" fps="+fps+" bitrate="+rate+" target="+host+":"+port);
@@ -66,6 +67,13 @@ public final class CastService extends Service {
         startForeground(7,new Notification.Builder(this,ch).setSmallIcon(android.R.drawable.ic_menu_camera).setContentTitle("九号独立投屏").setContentText("正在采集并发送 H.264/RTP UDP").setOngoing(true).build(),ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION);
     }
     private static int num(Intent i,String k,int d){try{return Integer.parseInt(i.getStringExtra(k));}catch(Exception e){return d;}}
+    private static int even(int value){return Math.max(2,value & ~1);}
+    private static int[] fitSize(int requestedWidth,int requestedHeight){
+        int w=Math.max(160,requestedWidth), h=Math.max(160,requestedHeight);
+        float scale=Math.min(1280f/w,720f/h);
+        if(scale<1f){w=Math.round(w*scale);h=Math.round(h*scale);}
+        return new int[]{even(w),even(h)};
+    }
     @Override public void onDestroy(){running=false;if(display != null)display.release();if(codec != null){try{codec.stop();}catch(Exception ignored){}codec.release();}if(projection != null)projection.stop();if(rtp != null)rtp.close();LogStore.add("CAST 已停止");super.onDestroy();}
     @Override public IBinder onBind(Intent i){return null;}
 }
