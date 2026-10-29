@@ -13,6 +13,8 @@ import android.view.Display;
 import android.view.WindowManager;
 import android.widget.*;
 import java.util.Locale;
+import dev.ichinomiya.ninebotcast.core.CaptureSize;
+import dev.ichinomiya.ninebotcast.core.DisplaySettings;
 
 /** Standalone virtual-display sender. It deliberately has no Bluetooth/GATT dependency. */
 public final class MainActivity extends Activity {
@@ -20,6 +22,7 @@ public final class MainActivity extends Activity {
     private TextView status, sizeLabel, networkLabel, logView;
     private EditText host, port;
     private int plannedWidth, plannedHeight;
+    private DisplaySettings plannedDisplay;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -34,8 +37,8 @@ public final class MainActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(28, 20, 28, 24);
         root.addView(text("独立虚拟屏投屏", 24, Color.BLACK));
-        root.addView(text("手机画面 → 自适应虚拟屏 → H.264/RTP", 15, Color.DKGRAY));
-        root.addView(text("程序不连接蓝牙，也不读写车辆 GATT。只负责创建虚拟屏和发送视频。", 13, Color.DKGRAY));
+        root.addView(text("原模块参数 → Android 虚拟屏 → H.264/RTP", 15, Color.DKGRAY));
+        root.addView(text("已移植原模块的整帧、虚拟屏、DPI 和自动尺寸规则；九号官方 Binder/车辆协议仍需官方 App 桥接。", 13, Color.DKGRAY));
 
         root.addView(section("1. 视频接收端"));
         root.addView(text("填写车机或视频接收器的网络地址。车辆专用地址和协议需要由接收端提供。", 13, Color.DKGRAY));
@@ -76,15 +79,17 @@ public final class MainActivity extends Activity {
             Display display = ((WindowManager) getSystemService(WINDOW_SERVICE)).getDefaultDisplay();
             android.graphics.Point p = new android.graphics.Point(); display.getRealSize(p);
             int sourceW = Math.max(p.x, p.y), sourceH = Math.min(p.x, p.y);
-            float ratio = sourceW / (float) Math.max(1, sourceH);
-            int maxW = 1280, maxH = 720;
-            if (ratio >= maxW / (float) maxH) { plannedWidth = maxW; plannedHeight = even(Math.round(maxW / ratio)); }
-            else { plannedHeight = maxH; plannedWidth = even(Math.round(maxH * ratio)); }
-            plannedWidth = Math.max(160, plannedWidth); plannedHeight = Math.max(160, plannedHeight);
-            String value = String.format(Locale.ROOT, "手机屏幕 %d×%d；自动虚拟屏 %d×%d（横屏，保持比例）", p.x, p.y, plannedWidth, plannedHeight);
+            CaptureSize capture = CaptureSize.fit(sourceW, sourceH);
+            plannedWidth = capture.width(); plannedHeight = capture.height();
+            plannedDisplay = DisplaySettings.defaults().withFrame(plannedWidth, plannedHeight);
+            String value = String.format(Locale.ROOT,
+                    "手机屏幕 %d×%d；整帧 %d×%d；虚拟屏 %d×%d；%d DPI（原模块自动规则）",
+                    p.x, p.y, plannedWidth, plannedHeight, plannedDisplay.virtualWidth,
+                    plannedDisplay.virtualHeight, plannedDisplay.dpi);
             if (sizeLabel != null) sizeLabel.setText(value);
+            LogStore.add("DISPLAY profile=" + plannedDisplay.label());
             LogStore.add("DISPLAY auto source=" + p.x + "x" + p.y + " virtual=" + plannedWidth + "x" + plannedHeight);
-        } catch (Exception e) { plannedWidth = 1280; plannedHeight = 720; if (sizeLabel != null) sizeLabel.setText("无法读取屏幕，使用默认虚拟屏 1280×720"); LogStore.add("DISPLAY auto failed=" + e); }
+        } catch (Exception e) { plannedWidth = 848; plannedHeight = 480; plannedDisplay = DisplaySettings.defaults(); if (sizeLabel != null) sizeLabel.setText("无法读取屏幕，使用原模块默认整帧 848×480、虚拟屏 640×440、160 DPI"); LogStore.add("DISPLAY auto failed=" + e); }
     }
 
     private static int even(int value) { return Math.max(2, value & ~1); }

@@ -9,6 +9,7 @@ import android.media.projection.*;
 import android.os.*;
 import android.view.*;
 import java.nio.*;
+import dev.ichinomiya.ninebotcast.core.DisplaySettings;
 
 public final class CastService extends Service {
     private MediaProjection projection;
@@ -23,9 +24,10 @@ public final class CastService extends Service {
         try {
             int[] size=fitSize(num(in,"width",1280), num(in,"height",720));
             int w=size[0], h=size[1], fps=num(in,"fps",20), rate=num(in,"bitrate",2500000);
+            DisplaySettings settings=DisplaySettings.defaults().withFrame(w,h);
             String host=in.getStringExtra("host"); int port=num(in,"port",5004);
             if (host == null || host.trim().isEmpty()) throw new IllegalArgumentException("未填写 UDP 目标地址");
-            LogStore.add("CAST 初始化 size="+w+"x"+h+" fps="+fps+" bitrate="+rate+" target="+host+":"+port);
+            LogStore.add("CAST 初始化 frame="+w+"x"+h+" virtual="+settings.virtualWidth+"x"+settings.virtualHeight+" dpi="+settings.dpi+" profile="+settings.label()+" fps="+fps+" bitrate="+rate+" target="+host+":"+port);
             createNotification();
             MediaProjectionManager manager=getSystemService(MediaProjectionManager.class);
             projection=manager.getMediaProjection(in.getIntExtra("result",0),(Intent)in.getParcelableExtra("data"));
@@ -38,7 +40,7 @@ public final class CastService extends Service {
             codec.configure(f,null,null,MediaCodec.CONFIGURE_FLAG_ENCODE);
             LogStore.add("CODEC configure video/avc color=surface");
             Surface surface=codec.createInputSurface(); codec.start();
-            display=projection.createVirtualDisplay("Ninebot Independent Cast",w,h,getResources().getDisplayMetrics().densityDpi,DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,surface,null,null);
+            display=projection.createVirtualDisplay("Ninebot Independent Cast",w,h,settings.dpi,DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,surface,null,null);
             running=true; LogStore.add("CAST running：等待编码输出");
             worker=new Thread(this::drain,"cast-encoder"); worker.start();
         } catch(Exception e) { LogStore.add("CAST 启动失败："+e); stopSelf(); }
