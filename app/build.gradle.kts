@@ -4,8 +4,8 @@ plugins { id("com.android.application") }
 val releaseVersion = Properties().apply { rootProject.file("version.properties").inputStream().use { load(it) } }
 android {
     namespace = "dev.ichinomiya.ninebotenhance"
-    compileSdk { version = release(36) { minorApiLevel = 1 } }
-    buildToolsVersion = "37.0.0"
+    compileSdk = 34
+    buildToolsVersion = "34.0.0"
     defaultConfig {
         applicationId = "dev.ichinomiya.ninebotenhance"
         minSdk = 30
