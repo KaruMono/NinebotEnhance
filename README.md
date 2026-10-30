@@ -48,6 +48,14 @@ python scripts/build.py --sdk "$ANDROID_HOME" --jdk "$JAVA_HOME" --allow-other-s
 
 前者产出调试 APK，后者运行主机测试并打包签名到 `dist/`；发布流程见 [发布说明](docs/release.md)。
 
+独立投屏应用及其 UDP 收发回归测试：
+
+```sh
+./gradlew :cast:assembleDebug :cast:hostTest
+```
+
+`cast` 使用系统录屏授权采集所选应用或手机屏幕，按仪表档案的应用区域、DPI 和预留区域合成整帧，再发送 H.264/RTP，需配合 UDP 视频接收端。主模块的虚拟显示器仍通过 Root / Shizuku 启动目标应用。
+
 ## 说明
 
 - 模块只通过九号自身接口读取车辆数据，对车辆的写入只有导航显示数据（仪表指令 113）和仪表昼夜主题，不改任何车辆设置。

@@ -83,6 +83,11 @@ def main():
         device_tests=work/'android-test-classes';device_tests.mkdir()
         run([tool(jdk/'bin','javac'),'-encoding','UTF-8','--release','17','-classpath',os.pathsep.join(map(str,[classes,android])),'-d',device_tests]+sorted((ROOT/'tests/android').glob('*.java')),records)
         test_output=run([tool(jdk/'bin','java'),'-cp',os.pathsep.join(map(str,[tests,classes,android])),'CoreTests'],records)
+        cast_tests=work/'cast-test-classes';cast_tests.mkdir()
+        cast_sources=sorted((ROOT/'cast/src/main/java').rglob('*.java'))+sorted((ROOT/'tests/cast').glob('*.java'))
+        run([tool(jdk/'bin','javac'),'-encoding','UTF-8','--release','17','-classpath',android,'-d',cast_tests]+cast_sources,records)
+        cast_test_output=run([tool(jdk/'bin','java'),'-cp',os.pathsep.join(map(str,[cast_tests,android])),
+                             'dev.ichinomiya.ninebotcast.CastTests'],records)
         jar=work/'program.jar'
         with zipfile.ZipFile(jar,'w',zipfile.ZIP_DEFLATED) as archive:
             for p in sorted(classes.rglob('*.class')):archive.write(p,p.relative_to(classes).as_posix())
@@ -143,6 +148,7 @@ def main():
         sha=hashlib.sha256(apk.read_bytes()).hexdigest();(dist/'SHA256SUMS.txt').write_text(sha+'  '+apk.name+'\n',encoding='utf-8')
         (dist/'artifact-checks.json').write_text(json.dumps({'version':name,'version_code':int(code),'package':PACKAGE,'apk':apk.name,'apk_size':apk.stat().st_size,
             'sha256':sha,'signing_certificate_sha256':certificate,'dex_classes':len(definitions),'host_assertions':int(re.search(r'PASS: (\d+)',test_output).group(1)),
+            'cast_host_assertions':int(re.search(r'PASS: (\d+)',cast_test_output).group(1)),
             'static_scope':['cn.ninebot.ninebot'],'xposed_api_bundled':False,'shizuku_sui_api':'13.1.5','shizuku_user_service':True,
             'android_runtime_tested':False,'m5p_tested':False,'shizuku_sui_device_tested':False,
             'system_screen_capture':True,'system_screen_capture_device_tested':False,

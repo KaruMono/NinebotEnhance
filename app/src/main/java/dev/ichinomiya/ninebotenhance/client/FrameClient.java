@@ -949,7 +949,7 @@ public final class FrameClient {
     /** Draws only the custom lock information over the current app frame; no native lock-screen/page layer is copied. */
     private void drawLockScreen(Canvas canvas, int width, int height) {
         LockScreenSettings lock = lockScreenSettings;
-        if (!phoneDisplayLocked() || (!savedSource.virtual() && !drawing)) return;
+        if (!savedSource.virtual() || !phoneDisplayLocked()) return;
         long now = System.currentTimeMillis();
         long elapsed = SystemClock.elapsedRealtime();
         float scale = Math.max(0.75f, Math.min(width, height) / 320f);
@@ -1014,7 +1014,7 @@ public final class FrameClient {
                     drawPanel.draw(canvas, width, height, HudPalette.of(dashboardDark), settings.background(dashboardDark), drawSettings, drawValues(SystemClock.elapsedRealtime()));
                 } else {
                     LockScreenSettings lock = lockScreenSettings;
-                    Bitmap picture = debug ? calibrationFrame() : (phoneDisplayLocked() && (!lock.keepAppRefreshing() || latest == null) && lastUnlocked != null ? lastUnlocked : latest);
+                    Bitmap picture = debug ? calibrationFrame() : (savedSource.virtual() && phoneDisplayLocked() && (!lock.keepAppRefreshing() || latest == null) && lastUnlocked != null ? lastUnlocked : latest);
                     if (picture == null || picture.isRecycled()) return false;
                     float[] r = debug ? new float[]{0, 0, width, height} : Geometry.fit(picture.getWidth(), picture.getHeight(), width, height);
                     canvas.drawBitmap(picture, null, new RectF(r[0], r[1], r[2], r[3]), paint);

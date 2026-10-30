@@ -23,11 +23,15 @@ public final class HiddenFeatureDialog {
         CheckBox throttle = check(activity, theme, content, "双向转把选项", current.throttle());
         CheckBox hardkey = check(activity, theme, content, "仪表按键卡片", current.hardkey());
         CheckBox cruise = check(activity, theme, content, "原版巡航入口", current.cruise());
+        CompoundButton.OnCheckedChangeListener save = (button, checked) ->
+                frames.saveHiddenFeatures(new HiddenFeatures(throttle.isChecked(), hardkey.isChecked(), cruise.isChecked()));
+        throttle.setOnCheckedChangeListener(save);
+        hardkey.setOnCheckedChangeListener(save);
+        cruise.setOnCheckedChangeListener(save);
         Button lock = pageButton(activity, theme, "锁屏设置");
         content.addView(lock, rowParams(activity));
         AlertDialog dialog = dialog(activity, theme, "隐藏功能", content);
         lock.setOnClickListener(v -> {
-            frames.saveHiddenFeatures(new HiddenFeatures(throttle.isChecked(), hardkey.isChecked(), cruise.isChecked()));
             dialog.dismiss();
             showLockMenu(activity, frames, reference);
         });

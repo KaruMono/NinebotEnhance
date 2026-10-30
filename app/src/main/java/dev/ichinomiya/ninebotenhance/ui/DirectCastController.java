@@ -316,13 +316,6 @@ public final class DirectCastController implements Application.ActivityLifecycle
     /** Called only after the observed cast manager's actual terminal operation, never its encoder rotation/reconfigure. */
     public void transportEnded(String reason) {
         if (session.cast() != DirectSession.Cast.RUNNING) return;
-        // Ninebot tears down its foreground lock-screen transport when the phone sleeps.
-        // Keep the module-owned display and session alive so the next encoder callback can
-        // continue with the module lock frame instead of returning to the native lock screen.
-        if (frames.displayLockActive()) {
-            frames.report("DIRECT native transport paused while phone is locked: " + reason);
-            return;
-        }
         String request = session.castRequest();
         main.post(() -> { if (session.ownsCast(request) && session.cast() == DirectSession.Cast.RUNNING) endCast(request, true, "巡航投屏已结束：" + reason); });
     }

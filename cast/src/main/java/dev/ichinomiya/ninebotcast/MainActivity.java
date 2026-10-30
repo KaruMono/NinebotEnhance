@@ -107,7 +107,7 @@ public final class MainActivity extends Activity {
         Intent i = new Intent(this, CastService.class).putExtra("result", result).putExtra("data", data)
                 .putExtra("host", host.getText().toString().trim()).putExtra("port", port.getText().toString().trim())
                 .putExtra("width", Integer.toString(plannedWidth)).putExtra("height", Integer.toString(plannedHeight));
-        startForegroundService(i); status.setText("虚拟屏已启动，正在发送视频"); LogStore.add("UI 启动自动虚拟屏投屏"); refreshLog();
+        startForegroundService(i); status.setText("正在启动投屏"); LogStore.add("UI 启动自动虚拟屏投屏"); refreshLog();
     }
 
     private void updateNetwork() {
